@@ -42,13 +42,64 @@ static void gyroBiasBegin()
 }
 #endif
 
-static void initialize()
+// IMU health: re-probe when no sample arrived for this long while running
+// (100 Hz ODR, so 50 samples), and retry a failed probe with a growing delay.
+#define IMU_STALL_TIMEOUT_MS 500
+#define IMU_RETRY_MIN_MS 1000
+#define IMU_RETRY_MAX_MS 30000
+static uint32_t lastSampleMs;
+static uint32_t retryDelayMs = IMU_RETRY_MIN_MS;
+
+// I2C bus recovery (UM10204 3.1.16): a slave that was mid-transfer when the
+// master reset or browned out keeps driving SDA low and the bus is dead until
+// it is clocked out. Nine SCL pulses with SDA released finish any byte plus
+// its ACK slot, then a STOP returns every slave to idle. Harmless on an idle
+// bus. Must run while the pins are not attached to the I2C peripheral.
+static void i2cBusClear()
 {
+    pinMode(PIN_SDA, INPUT_PULLUP);
+    pinMode(PIN_SCL, OUTPUT_OPEN_DRAIN);
+    digitalWrite(PIN_SCL, HIGH);
+    delayMicroseconds(5);
+    for (int i = 0; i < 9; i++)
+    {
+        digitalWrite(PIN_SCL, LOW);
+        delayMicroseconds(5);
+        digitalWrite(PIN_SCL, HIGH);
+        delayMicroseconds(5);
+    }
+    // STOP: SDA low -> high while SCL is high
+    digitalWrite(PIN_SCL, LOW);
+    pinMode(PIN_SDA, OUTPUT_OPEN_DRAIN);
+    digitalWrite(PIN_SDA, LOW);
+    delayMicroseconds(5);
+    digitalWrite(PIN_SCL, HIGH);
+    delayMicroseconds(5);
+    digitalWrite(PIN_SDA, HIGH);
+    delayMicroseconds(5);
+    pinMode(PIN_SDA, INPUT_PULLUP);
+    pinMode(PIN_SCL, INPUT_PULLUP);
+}
+
+static void i2cBegin()
+{
+    i2cBusClear();
     Wire.begin(PIN_SDA, PIN_SCL);
     Wire.setClock(400000);
     Wire.setTimeout(1000);
+}
 
-    // Initializing the IMU
+static void i2cRestart()
+{
+#if defined(PLATFORM_ESP32)
+    Wire.end();     // release the pins so the bus clear can drive them
+#endif
+    i2cBegin();
+}
+
+// Probe the supported IMUs; on success imu is set up and its interrupt attached.
+static bool probeIMU()
+{
     // ICMSeries first: it matches an exact WHO_AM_I list, while the MPU6050
     // check masks bit 0 and would also take an ICM-42670-S (0x69) for an MPU6050.
     imu = new ICMSeries();
@@ -70,21 +121,18 @@ static void initialize()
             else {
                 delete imu;
                 imu = nullptr;
-                ht_state = STATE_ERROR;
-                return;
+                return false;
             }
         }
     }
-    imu->setInterruptHandler(PIN_INT);
     if (imu->getDeltaTime() <= 0.0f) {
         delete imu;
         imu = nullptr;
-        ht_state = STATE_ERROR;
-        return;
+        return false;
     }
+    imu->setInterruptHandler(PIN_INT);
 
-    FusionAhrsInitialise(&ahrs);
-    // Set AHRS algorithm settings
+    // Set AHRS algorithm settings (they depend on the IMU type)
     const unsigned int recoveryTriggerPeriod = (unsigned int) ((5.0f / imu->getDeltaTime()) + 0.5f);
     const FusionAhrsSettings settings = {
             .convention = FusionConventionNwu,
@@ -95,17 +143,54 @@ static void initialize()
             .recoveryTriggerPeriod = recoveryTriggerPeriod,
     };
     FusionAhrsSetSettings(&ahrs, &settings);
-    DBGLN("starting head tracker");
+    return true;
+}
+
+static void dropIMU()
+{
+    detachInterrupt(PIN_INT);
+    delete imu;
+    imu = nullptr;
+}
+
+// Called with the config loaded, after a (re-)probe found the IMU.
+static void imuOnline()
+{
+    imu->setCalibration(config.GetIMUCalibration());
+#if defined(HT_GYRO_BIAS_TRACKING)
+    gyroBiasBegin();
+#endif
+    lastSampleMs = millis();
+    retryDelayMs = IMU_RETRY_MIN_MS;
     ht_state = STATE_RUNNING;
+}
+
+static void initialize()
+{
+    FusionAhrsInitialise(&ahrs);
+    i2cBegin();
+
+    // Initializing the IMU, with a short backoff: right after power-up the
+    // IMU may still be in its start-up time, or the slot rail still ramping.
+    static const uint16_t backoffMs[] = {0, 10, 50, 200};
+    for (unsigned int i = 0; i < sizeof(backoffMs) / sizeof(backoffMs[0]); i++)
+    {
+        if (backoffMs[i]) {
+            delay(backoffMs[i]);
+            i2cRestart();
+        }
+        if (probeIMU()) {
+            DBGLN("starting head tracker");
+            ht_state = STATE_RUNNING;
+            return;
+        }
+    }
+    DBGLN("no IMU found, retrying later");
+    ht_state = STATE_ERROR;
 }
 
 static int start()
 {
-    if (ht_state == STATE_ERROR || imu == nullptr)
-    {
-        return DURATION_NEVER;
-    }
-    imu->setCalibration(config.GetIMUCalibration());
     memcpy(orientation, *config.GetBoardOrientation(), sizeof(orientation));
 
 #ifdef DEBUG_LOG
@@ -117,10 +202,37 @@ static int start()
         orientation[2] = 0;
     }
     FusionAhrsReset(&ahrs);
-#if defined(HT_GYRO_BIAS_TRACKING)
-    gyroBiasBegin();
-#endif
+    if (imu == nullptr)
+    {
+        ht_state = STATE_ERROR;
+        return retryDelayMs;
+    }
+    imuOnline();
     return DURATION_IMMEDIATELY;
+}
+
+// The IMU stopped producing samples (e.g. it was reset by a supply dip and
+// lost its configuration, or it holds SDA low) or was never found: clear
+// the bus and probe again, backing off while it keeps failing. The AHRS
+// state, orientation and centre are kept so a recovered IMU carries on.
+static int recoverIMU()
+{
+    if (imu != nullptr)
+    {
+        DBGLN("IMU stalled, re-initialising");
+        dropIMU();
+    }
+    ht_state = STATE_ERROR;
+    i2cRestart();
+    if (probeIMU())
+    {
+        DBGLN("IMU recovered");
+        imuOnline();
+        return DURATION_IMMEDIATELY;
+    }
+    const int wait = retryDelayMs;
+    retryDelayMs = retryDelayMs * 2 > IMU_RETRY_MAX_MS ? IMU_RETRY_MAX_MS : retryDelayMs * 2;
+    return wait;
 }
 
 // Normalizes any number to an arbitrary range
@@ -166,11 +278,19 @@ static int timeout()
 {
     FusionVector a;
     FusionVector g;
+
+    if (imu == nullptr || ht_state == STATE_ERROR) {
+        return recoverIMU();
+    }
     const float deltaTime = imu->getDeltaTime();
 
     if (!imu->readIMUData(a, g)) {
+        if (millis() - lastSampleMs > IMU_STALL_TIMEOUT_MS) {
+            return recoverIMU();
+        }
         return DURATION_IMMEDIATELY;
     }
+    lastSampleMs = millis();
 
     switch (ht_state) {
         case STATE_RUNNING: {
@@ -201,6 +321,9 @@ static int timeout()
             }
             break;
         }
+
+        default:
+            break;
     }
 
     return DURATION_IMMEDIATELY;
