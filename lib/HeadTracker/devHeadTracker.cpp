@@ -33,6 +33,8 @@ static FusionEuler euler;
 static float rollHome = 0, pitchHome = 0, yawHome = 0;
 static int calibrationData[3][2];
 static uint32_t cal_started;
+// set by startIMUCalibration() (web server task), handled in timeout()
+static volatile bool calRequested = false;
 
 #if defined(HT_GYRO_BIAS_TRACKING)
 // Run-time gyro bias (boot calibration + stillness-gated runtime estimate),
@@ -299,11 +301,17 @@ static void rotate(float pn[3], const float rot[3]) {
     }
 }
 
+static void beginIMUCalibration();
+
 static int timeout()
 {
     FusionVector a;
     FusionVector g;
 
+    if (calRequested) {
+        calRequested = false;   // ignored while there is no IMU
+        beginIMUCalibration();
+    }
     if (imu == nullptr || ht_state == STATE_ERROR) {
         return recoverIMU();
     }
@@ -382,7 +390,9 @@ static int timeout()
     return DURATION_IMMEDIATELY;
 }
 
-void startIMUCalibration()
+// Runs in the device loop (timeout()), never in the web server task: the
+// IMU object may be deleted and re-created there by recoverIMU().
+static void beginIMUCalibration()
 {
     if (imu == nullptr || ht_state == STATE_ERROR)
     {
@@ -399,6 +409,12 @@ void startIMUCalibration()
 #endif
     cal_started = millis();
     ht_state = STATE_IMU_CALIBRATING;
+}
+
+// Called from the web server (AsyncTCP) task: only flag the request.
+void startIMUCalibration()
+{
+    calRequested = true;
 }
 
 HeadTrackerState getHeadTrackerState()
