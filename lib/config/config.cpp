@@ -189,6 +189,21 @@ VrxBackpackConfig::SetDefaults()
     m_config.vbat.offset = -2;
 #endif
 
+#if defined(HAS_HEADTRACKING) && defined(HT_DEFAULT_ORIENTATION)
+    // Board mounting rotation for boards with a fixed position, as degrees
+    // x,y,z in the order of the web UI "o:x:y:z" command (setBoardOrientation).
+    // Stored in radians like saveBoardOrientation() does.
+    {
+        const float defaultOrientation[] = {HT_DEFAULT_ORIENTATION};
+        static_assert(sizeof(defaultOrientation) / sizeof(defaultOrientation[0]) == 3,
+                      "HT_DEFAULT_ORIENTATION must be three angles in degrees: x,y,z");
+        for (int i = 0; i < 3; i++)
+        {
+            m_config.boardOrientation[i] = defaultOrientation[i] * 0.017453292519943295f;
+        }
+    }
+#endif
+
     m_modified = true;
     Commit();
 }
