@@ -15,6 +15,9 @@
 #include "MPU6050.h"
 #include "QMI8658C.h"
 #include "Fusion.h"
+#if defined(HT_GYRO_BIAS_TRACKING)
+#include "GyroBias.h"
+#endif
 
 static HeadTrackerState ht_state = STATE_ERROR;
 static IMUBase *imu;
@@ -26,6 +29,18 @@ static FusionEuler euler;
 static float rollHome = 0, pitchHome = 0, yawHome = 0;
 static int calibrationData[3][2];
 static uint32_t cal_started;
+
+#if defined(HT_GYRO_BIAS_TRACKING)
+// Run-time gyro bias (boot sample + FusionOffset), RAM only: nothing is
+// persisted, so there is no flash wear however often it adapts.
+static GyroBiasEstimator gyroBias;
+
+static void gyroBiasBegin()
+{
+    const unsigned int rate = (unsigned int)((1.0f / imu->getDeltaTime()) + 0.5f);
+    gyroBias.begin(GyroBiasDefaultSettings(rate));
+}
+#endif
 
 static void initialize()
 {
@@ -100,6 +115,9 @@ static int start()
         orientation[2] = 0;
     }
     FusionAhrsReset(&ahrs);
+#if defined(HT_GYRO_BIAS_TRACKING)
+    gyroBiasBegin();
+#endif
     return DURATION_IMMEDIATELY;
 }
 
@@ -154,6 +172,10 @@ static int timeout()
 
     switch (ht_state) {
         case STATE_RUNNING: {
+#if defined(HT_GYRO_BIAS_TRACKING)
+            // sensor frame, after the stored calibration, before the board rotation
+            g = gyroBias.update(g);
+#endif
             rotate(a.array, orientation);
             rotate(g.array, orientation);
 
@@ -170,6 +192,9 @@ static int timeout()
             if (imu->updateCalibration(g)) {
                 config.SetIMUCalibration(imu->getCalibration());
                 config.Commit();
+#if defined(HT_GYRO_BIAS_TRACKING)
+                gyroBiasBegin();    // the stored calibration changed: re-estimate from scratch
+#endif
                 ht_state = STATE_RUNNING;
             }
             break;
