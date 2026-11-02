@@ -131,7 +131,7 @@ static void handle(char *cmd)
         else printCard();
     } else if (!strcmp(cmd, "rekey")) {
         if (euMsSinceBootPress() > 10000) out("press BOOT, then run rekey within 10 s\r\n");
-        else if (!euRekey()) out("rekey failed (c3cred partition missing?)\r\n");
+        else if (!euRekey()) out("rekey failed (c3cred partition missing, or radio off: no hardware RNG)\r\n");
         else {
             euLogEvent(EV_REKEY, 0, true);
             out("new credential (the old card no longer works):\r\n");

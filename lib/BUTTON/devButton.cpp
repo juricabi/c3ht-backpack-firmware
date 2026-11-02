@@ -22,8 +22,11 @@ void RebootIntoWifi(wifi_service_t service);
 void euNoteBootPress();
 void euCredentialReset();
 void ledShowPattern(const uint8_t *seq, uint8_t count, uint32_t durationMs);
+void ledCancelPattern();
 static bool ignoreUntilRelease = false;
 static bool resetArmed = false;
+static bool countdownShown = false;
+static uint8_t highSamples = 0;   // consecutive released (HIGH) samples
 static const uint8_t LED_COUNTDOWN[] = {5, 5};
 static const uint8_t LED_ARMED[] = {2, 2};
 
@@ -35,7 +38,10 @@ static void longPress()
     if (n == 0)
         euNoteBootPress();
     else if (n == 3)
+    {
+        countdownShown = true;
         ledShowPattern(LED_COUNTDOWN, sizeof(LED_COUNTDOWN), 9000);
+    }
     else if (n >= 19 && !resetArmed)
     {
         resetArmed = true;
@@ -79,12 +85,22 @@ static int timeout()
 #if defined(C3HT_EU_BUILD)
     int next = button.update();
     bool released = digitalRead(PIN_BUTTON) == HIGH;
-    if (ignoreUntilRelease && released)
+    highSamples = released ? (highSamples < 255 ? highSamples + 1 : 255) : 0;
+    // Button reports the release (short press) on the 2nd HIGH sample; clear the
+    // boot-time ignore flag only after that, so that release is swallowed too.
+    if (ignoreUntilRelease && highSamples >= 3)
         ignoreUntilRelease = false;
     if (resetArmed && released)
     {
         resetArmed = false;
+        countdownShown = false;
         euCredentialReset();
+    }
+    else if (countdownShown && released)
+    {
+        // released before 10 s: no reset, stop the countdown pattern
+        countdownShown = false;
+        ledCancelPattern();
     }
     return next;
 #else

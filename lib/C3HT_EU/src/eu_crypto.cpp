@@ -75,8 +75,9 @@ uint16_t euCrc16(const uint8_t *data, size_t len)
 
 void euRandom(void *buf, size_t len)
 {
-    // TRNG: valid because the RF subsystem is running whenever secrets are made
-    // (AP mode or ESP-NOW mode). See DESIGN.md section 2.4.
+    // TRNG only while the RF subsystem runs (AP or ESP-NOW mode). Callers that
+    // can run with the radio stopped check euRfRunning() first (euRekey).
+    // See DESIGN.md section 2.4.
     esp_fill_random(buf, len);
 }
 

@@ -18,6 +18,14 @@ bool euCapTxPower()
     return p > 0 && p <= C3HT_EU_MAX_TX_QDBM;
 }
 
+static bool rfStopped = false;   // set when the radio was stopped (fail closed)
+
+// True only while the RF subsystem runs: esp_fill_random() is a true RNG then.
+bool euRfRunning()
+{
+    return !rfStopped && euReadTxPower() > 0;
+}
+
 int8_t euReadTxPower()
 {
     int8_t p = -1;
@@ -32,6 +40,7 @@ bool euEspNowRadioSetup()
 {
     if (!euCapTxPower()) {
         euLogEvent(EV_TXPOWER_FAIL, 1, true);
+        rfStopped = true;
         esp_wifi_stop();
         return false;
     }
@@ -39,6 +48,7 @@ bool euEspNowRadioSetup()
     esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
     if (!euCapTxPower()) {
         euLogEvent(EV_TXPOWER_FAIL, 2, true);
+        rfStopped = true;
         esp_wifi_stop();
         return false;
     }

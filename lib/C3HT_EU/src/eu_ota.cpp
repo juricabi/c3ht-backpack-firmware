@@ -166,7 +166,10 @@ static void fail(const char *why, uint16_t code)
         esp_ota_abort(handle);
         handle = 0;
     }
-    if (part) esp_partition_erase_range(part, 0, 4096);   // no bootable header left behind
+    // No bootable header left behind, but never erase the slot that is already
+    // selected for the next boot (an accepted update, or the running image).
+    if (part && part != esp_ota_get_boot_partition() && part != esp_ota_get_running_partition())
+        esp_partition_erase_range(part, 0, 4096);
     strlcpy(msg, why, sizeof(msg));
     st = OTA_FAILED;
     euLogEvent(EV_UPDATE_REJECT, code, true);
@@ -182,9 +185,19 @@ const char *euOtaBegin(size_t len, bool allowOtherEuTarget)
 {
     Lock l;
     if (st == OTA_RECEIVING || st == OTA_VERIFYING) return "an update is already in progress";
+    // After an accepted update the next-update slot (counted from the RUNNING
+    // partition) is the slot that was just made bootable: a second upload would
+    // overwrite the verified image with unverified bytes before the reboot.
+    if (st == OTA_DONE) return "update accepted; rebooting";
+    const esp_partition_t *bootp = esp_ota_get_boot_partition();
+    if (bootp && bootp != esp_ota_get_running_partition()) return "an accepted update is pending; reboot first";
     if (!euOtaEnabled()) return "OTA disabled in this build (no public key); update over USB";
     part = esp_ota_get_next_update_partition(nullptr);
     if (!part) return "no OTA partition";
+    if (part == bootp) {   // defence in depth: never write into the boot slot
+        part = nullptr;
+        return "no free OTA partition";
+    }
     if (len < 64 * 1024 || len > part->size) return "bad image size";
     if (esp_ota_begin(part, OTA_WITH_SEQUENTIAL_WRITES, &handle) != ESP_OK) {
         handle = 0;

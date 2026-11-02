@@ -100,6 +100,7 @@ void euWebEndSessions();
 // ---- radio (eu_rf.cpp) ------------------------------------------------------------
 bool euCapTxPower();             // apply and read back C3HT_EU_MAX_TX_QDBM
 int8_t euReadTxPower();          // -1 if Wi-Fi not started
+bool euRfRunning();              // RF on: hardware RNG is a TRNG
 
 // ---- misc (eu_main.cpp) ---------------------------------------------------------
 uint32_t euMsSinceBootPress();

@@ -260,6 +260,7 @@ bool euGeneratePassword(char out[21])
 bool euRekey()
 {
     if (!euCredPartPresent()) return false;
+    if (!euRfRunning()) return false;   // RF off: esp_fill_random is not a TRNG
     uint8_t rec[EU_REC_LEN] = {0};
     memcpy(rec, "C3H1", 4);
     rec[4] = 1;

@@ -52,5 +52,6 @@ bool euCredPresent();
 
 // ---- LED (lib/LED/devLED.cpp) --------------------------------------------
 void ledShowPattern(const uint8_t *seq, uint8_t count, uint32_t durationMs);
+void ledCancelPattern();
 
 #endif // C3HT_EU_BUILD

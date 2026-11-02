@@ -126,6 +126,17 @@ void ledShowPattern(const uint8_t *seq, uint8_t count, uint32_t durationMs)
     _durations = nullptr;   // force event() to (re)start the sequence
     devicesTriggerEvent();
 }
+
+// Stop a temporary pattern early and return to the normal state pattern.
+void ledCancelPattern()
+{
+    if (!euSeq)
+        return;
+    euSeq = nullptr;
+    _durations = nullptr;   // event() restarts the state pattern (if any)
+    digitalWrite(PIN_LED, HIGH ^ _pin_inverted);
+    devicesTriggerEvent();
+}
 #endif
 
 void turnOffLED()
