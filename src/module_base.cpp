@@ -168,6 +168,11 @@ MSPModuleBase::Loop(uint32_t now)
             msp.markPacketReceived();
         }
     }
+
+    // Loop() is not virtual, so every subclass must chain to the base. Without this,
+    // MSP based modules (SkyzoneMSP, HDZero) never ran the on-board head tracker
+    // sender, unlike CrsfModuleBase and MFDCrossbow which already chain to it.
+    ModuleBase::Loop(now);
 }
 
 
