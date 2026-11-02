@@ -668,7 +668,9 @@ void loop()
         ESP.restart();
       }
   #elif defined(PLATFORM_ESP32)
-    if (rebootTime != 0 && now > rebootTime && uxQueueMessagesWaiting(rxqueue) == 0)
+    // In WiFi update mode nothing consumes rxqueue (see below), so do not
+    // wait for it to empty.
+    if (rebootTime != 0 && now > rebootTime && (connectionState == wifiUpdate || uxQueueMessagesWaiting(rxqueue) == 0))
       {
         turnOffLED();
         ESP.restart();
@@ -715,6 +717,12 @@ void loop()
       sendRTCChangesToVrx = false;
       vrxModule.SetRTC();
     }
+#if defined(PLATFORM_ESP32)
+    // WiFi mode entered without a reboot (the MSP 'W' command) leaves
+    // ESP-NOW and its receive callback running, but the queue is only read
+    // below. Drop what arrives so the callback never blocks on a full queue.
+    xQueueReset(rxqueue);
+#endif
     return;
   }
 
