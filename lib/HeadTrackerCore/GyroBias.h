@@ -20,7 +20,12 @@
 //     Once an estimate has been accepted the threshold is 1 deg/s and each
 //     stillness episode may move the bias by at most
 //     0.05 deg/s + 0.02 deg/s/K * |temperature change since the last update|,
-//     because a gyro cannot tell a slow steady head turn from bias. Before
+//     because a gyro cannot tell a slow steady head turn from bias. In
+//     total, the bias also stays within the same limit measured from the
+//     calibration (boot, web "ci", or the first converged estimate):
+//     |bias - calibration| <= 0.05 deg/s + 0.02 deg/s/K * |T - T_cal|
+//     per axis, so repeated slow pans cannot walk it away step by step
+//     (without a temperature reading it is 0.05 deg/s). Before
 //     that (boot calibration failed) it runs like FusionOffset: 3 deg/s
 //     threshold and no step clamp, until 25 s of still time have converged it.
 //  F3 temperature compensation (BiasTempModel): every accepted estimate is
@@ -58,8 +63,10 @@ struct GyroBiasSettings
     float timeoutS;                 // still time before the estimate adapts
     float cutoffHz;                 // low-pass cut-off of the adaptation
     float unlockStillS;             // still (adapting) time that counts as converged
-    float stepClampDps;             // max bias change per stillness episode ...
+    float stepClampDps;             // max bias change per stillness episode, and
+                                    // max distance from the calibration ...
     float stepClampDpsPerK;         // ... plus this per K since the last update
+                                    // (episode) or since the calibration (total)
     float maxBiasDps;               // clamp for the total estimate, per axis
 };
 
@@ -129,6 +136,8 @@ public:
 private:
     void acceptEstimate();
     void clampBias(FusionVector &b) const;
+    float envelopeLimit() const;
+    void clampEnvelope(FusionVector &b) const;
     bool accelStill(const FusionVector &accel) const;
     void updateTemperature(float temperatureC);
     FusionVector modelBias() const;
@@ -148,6 +157,9 @@ private:
     FusionVector m_bias;        // applied bias
     FusionVector m_anchor;      // last accepted estimate ...
     float m_anchorTemp;         // ... and its temperature
+    FusionVector m_cal;         // first accepted estimate (calibration) ...
+    float m_calTemp;            // ... its temperature
+    bool m_calTempValid;
 
     // stillness episode
     unsigned int m_timer;

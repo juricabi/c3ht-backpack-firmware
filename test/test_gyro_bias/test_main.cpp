@@ -327,6 +327,59 @@ void test_step_clamp_limits_slow_pan()
 
 // F2 accel gate: a slow pitch (0.5 deg/s, below the gyro threshold) turns the
 // gravity vector, so it is not taken as stillness.
+// Repeated slow pans (body or chair yaw, slowly following a target) with a
+// quick snap back in between. Each pan is a stillness episode that may move
+// the bias by one step clamp; the total must stay within the envelope around
+// the boot calibration instead of growing by one step per episode (it used
+// to reach the pan rate itself: -90 deg after 40 cycles of 0.3 deg/s x 8 s).
+static float slowPanCycles(GyroBiasEstimator &est, float rate, float panS, int cycles, float &yawErr)
+{
+    const FusionVector a = {{0.0f, 0.0f, 1.0f}};
+    const float trueBias = 0.4f;
+    double err = 0;
+    for (int i = 0; i < 10 * (int)RATE; i++)     // boot: still
+    {
+        const FusionVector g = {{0.0f, 0.0f, trueBias + gauss(0.07f)}};
+        err += est.update(g, a, 30.0f).axis.z * DT;
+    }
+    float maxDev = 0;
+    const int nPan = (int)(panS * RATE + 0.5f);
+    const int nBack = (int)(0.2f * RATE);
+    const float back = -rate * panS / 0.2f;
+    for (int c = 0; c < cycles; c++)
+    {
+        for (int i = 0; i < nPan + nBack; i++)
+        {
+            const float w = i < nPan ? rate : back;
+            const FusionVector g = {{0.0f, 0.0f, w + trueBias + gauss(0.07f)}};
+            err += (est.update(g, a, 30.0f).axis.z - w) * DT;
+            const float dev = fabsf(est.bias().axis.z - trueBias);
+            if (dev > maxDev) maxDev = dev;
+        }
+    }
+    yawErr = (float)err;
+    return maxDev;
+}
+
+void test_repeated_slow_pans_stay_in_envelope()
+{
+    const float rates[3] = {0.3f, 0.8f, 0.3f};
+    const float pans[3] = {8.0f, 6.0f, 3.5f};
+    for (int k = 0; k < 3; k++)
+    {
+        rngState = 12345u + k;
+        GyroBiasEstimator est;
+        est.begin(GyroBiasDefaultSettings(RATE));
+        float yawErr = 0;
+        const float maxDev = slowPanCycles(est, rates[k], pans[k], 40, yawErr);
+        TEST_ASSERT_TRUE(est.bootSampleAccepted());
+        // 0.05 deg/s envelope (constant temperature) + boot calibration error
+        TEST_ASSERT_LESS_THAN_FLOAT(0.05f + 0.01f, maxDev);
+        // at most ~0.06 deg/s over the ~5.5 min of cycles
+        TEST_ASSERT_LESS_THAN_FLOAT(0.06f * 40 * (pans[k] + 0.2f), fabsf(yawErr));
+    }
+}
+
 void test_accel_gate_blocks_slow_tilt()
 {
     GyroBiasEstimator est;
@@ -511,6 +564,7 @@ int main(int, char **)
     RUN_TEST(test_boot_calibration_rejects_noise);
     RUN_TEST(test_boot_calibration_rejects_large_bias);
     RUN_TEST(test_step_clamp_limits_slow_pan);
+    RUN_TEST(test_repeated_slow_pans_stay_in_envelope);
     RUN_TEST(test_accel_gate_blocks_slow_tilt);
     RUN_TEST(test_begin_and_restart_calibrated);
     RUN_TEST(test_still_calibrator);

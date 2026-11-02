@@ -225,6 +225,9 @@ void GyroBiasEstimator::begin(const GyroBiasSettings &settings)
     m_bias = FUSION_VECTOR_ZERO;
     m_anchor = FUSION_VECTOR_ZERO;
     m_anchorTemp = 0.0f;
+    m_cal = FUSION_VECTOR_ZERO;
+    m_calTemp = 0.0f;
+    m_calTempValid = false;
 
     m_timer = 0;
     m_active = false;
@@ -270,9 +273,17 @@ void GyroBiasEstimator::clampBias(FusionVector &b) const
 }
 
 // An estimate is accepted: it becomes the reference for the step clamp and
-// the value applied between stillness episodes.
+// the value applied between stillness episodes. The first one (boot or web
+// calibration, or the unlocked estimate once converged) is also the centre of
+// the envelope (envelopeLimit()) for everything that follows.
 void GyroBiasEstimator::acceptEstimate()
 {
+    if (!m_locked)
+    {
+        m_cal = m_bias;
+        m_calTemp = m_temp;
+        m_calTempValid = m_tempValid;
+    }
     m_anchor = m_bias;
     m_anchorTemp = m_temp;
     m_locked = true;
@@ -291,6 +302,34 @@ FusionVector GyroBiasEstimator::modelBias() const
         return m_anchor;
     }
     return FusionVectorAdd(m_anchor, m_model.delta(m_anchorTemp, m_temp));
+}
+
+// Largest |bias - calibration| allowed while locked. A slow steady head turn
+// below the stillness threshold looks exactly like bias; measured per episode
+// it could add one step clamp per episode without limit. Measured from the
+// calibration it stays below stepClampDps plus what the temperature change
+// since the calibration can explain.
+float GyroBiasEstimator::envelopeLimit() const
+{
+    float lim = m_settings.stepClampDps;
+    if (m_calTempValid && m_tempValid)
+    {
+        lim += m_settings.stepClampDpsPerK * fabsf(m_temp - m_calTemp);
+    }
+    return lim;
+}
+
+void GyroBiasEstimator::clampEnvelope(FusionVector &b) const
+{
+    if (!m_locked)
+    {
+        return;
+    }
+    const float lim = envelopeLimit();
+    for (int i = 0; i < 3; i++)
+    {
+        b.array[i] = clampf(b.array[i], m_cal.array[i] - lim, m_cal.array[i] + lim);
+    }
 }
 
 bool GyroBiasEstimator::accelStill(const FusionVector &accel) const
@@ -323,6 +362,7 @@ FusionVector GyroBiasEstimator::update(FusionVector gyro, const FusionVector &ac
     if (!m_active)
     {
         m_bias = modelBias();
+        clampEnvelope(m_bias);
         clampBias(m_bias);
     }
 
@@ -387,6 +427,7 @@ FusionVector GyroBiasEstimator::update(FusionVector gyro, const FusionVector &ac
         b = clampf(b, m_base.array[i] - lim, m_base.array[i] + lim);
         m_bias.array[i] = b;
     }
+    clampEnvelope(m_bias);
     clampBias(m_bias);
 
     if (!m_locked && m_stillTotal >= m_unlockN)
