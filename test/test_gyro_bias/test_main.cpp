@@ -1,5 +1,7 @@
-// Host test for lib/HeadTrackerCore/GyroBias: synthetic 100 Hz gyro data with a
-// constant zero-rate offset, a slow temperature drift and white noise.
+// Host test for lib/HeadTrackerCore/GyroBias: synthetic 100 Hz IMU data with
+// a constant zero-rate offset, an optional temperature-driven drift, white
+// noise on gyro and accel, and simulated head motion (the accel is the
+// gravity vector rotated by the integrated true motion).
 // Run with: pio test -e native -f test_gyro_bias
 #include <unity.h>
 #include <math.h>
@@ -10,6 +12,7 @@
 static const unsigned int RATE = 100;
 static const float DT = 1.0f / RATE;
 static const float PI_F = 3.14159265f;
+static const float D2R = PI_F / 180.0f;
 
 // deterministic Gaussian noise (LCG + Box-Muller)
 static uint32_t rngState;
@@ -24,11 +27,17 @@ static float gauss(float sigma)
     return sigma * sqrtf(-2.0f * logf(u1)) * cosf(2.0f * PI_F * u2);
 }
 
+// temperature profile: returns degC at time t
+typedef float (*TempFn)(float t);
+static float temp25(float) { return 25.0f; }
+static float noTemp(float) { return NAN; }
+
 struct Sim
 {
-    float bias[3];          // true offset (deg/s)
-    float driftPerMin[3];   // true offset change (deg/s per minute), e.g. warm-up
-    float noise;            // white noise sigma (deg/s)
+    float bias[3];          // true offset at 25 degC (deg/s)
+    float tempco[3];        // true offset change (deg/s per K)
+    float noise;            // gyro white noise sigma (deg/s)
+    TempFn temp;
 };
 
 // head motion: returns the true angular rate (deg/s) at time t
@@ -55,7 +64,7 @@ static void pilot(float t, float out[3])
     }
 }
 
-// keeps moving for the first 20 s (boot sample must time out), then still
+// keeps moving for the first 20 s (boot calibration must time out), then still
 static void busyBoot(float t, float out[3])
 {
     if (t < 20.0f)
@@ -70,33 +79,65 @@ static void busyBoot(float t, float out[3])
     }
 }
 
+// still for 10 s (boot), then a slow, steady 0.5 deg/s pan about gravity
+static void slowPan(float t, float out[3])
+{
+    out[0] = out[1] = 0;
+    out[2] = t < 10.0f ? 0.0f : 0.5f;
+}
+
+// still for 10 s (boot), then a slow, steady 0.5 deg/s pitch (tilts gravity)
+static void slowPitch(float t, float out[3])
+{
+    out[1] = out[2] = 0;
+    out[0] = t < 10.0f ? 0.0f : 0.5f;
+}
+
 struct Result
 {
     float residual[3];      // |true bias - estimate| at the end (deg/s)
+    float maxAbsBias;       // largest |estimate| on any axis at any time
     float yawErrLastMin;    // integrated yaw error over the last 60 s (deg)
     unsigned int bootDoneAt; // sample index at which the boot phase ended
 };
 
-static Result run(const Sim &sim, MotionFn motion, float seconds, GyroBiasEstimator &est)
+struct State
+{
+    float t;
+    float grav[3];          // gravity in the body frame (g)
+};
+
+static void stateInit(State &s)
+{
+    s.t = 0;
+    s.grav[0] = 0;
+    s.grav[1] = 0;
+    s.grav[2] = 1;
+}
+
+static Result run(const Sim &sim, MotionFn motion, float seconds, GyroBiasEstimator &est, State &st)
 {
     Result r = {};
     r.bootDoneAt = 0;
-    const unsigned int n = (unsigned int)(seconds * RATE);
-    const unsigned int lastMin = n - 60 * RATE;
+    const unsigned int n = (unsigned int)(seconds * RATE + 0.5f);
+    const unsigned int lastMin = n > 60 * RATE ? n - 60 * RATE : 0;
     float trueBias[3] = {0, 0, 0};
     for (unsigned int i = 0; i < n; i++)
     {
-        const float t = i * DT;
+        const float t = st.t;
         float w[3];
         motion(t, w);
-        FusionVector g;
+        const float T = sim.temp(t);
+        const float Tb = isnan(T) ? 25.0f : T;
+        FusionVector g, a;
         for (int k = 0; k < 3; k++)
         {
-            trueBias[k] = sim.bias[k] + sim.driftPerMin[k] * t / 60.0f;
+            trueBias[k] = sim.bias[k] + sim.tempco[k] * (Tb - 25.0f);
             g.array[k] = w[k] + trueBias[k] + gauss(sim.noise);
+            a.array[k] = st.grav[k] + gauss(0.001f);
         }
         const bool wasDone = est.bootSampleDone();
-        const FusionVector c = est.update(g);
+        const FusionVector c = est.update(g, a, isnan(T) ? T : T + gauss(0.02f));
         if (!wasDone && est.bootSampleDone())
         {
             r.bootDoneAt = i + 1;
@@ -105,6 +146,20 @@ static Result run(const Sim &sim, MotionFn motion, float seconds, GyroBiasEstima
         {
             r.yawErrLastMin += (c.axis.z - w[2]) * DT;
         }
+        for (int k = 0; k < 3; k++)
+        {
+            const float b = fabsf(est.bias().array[k]);
+            if (b > r.maxAbsBias) r.maxAbsBias = b;
+        }
+        // rotate the body-frame gravity: dv/dt = v x w
+        float v[3] = {st.grav[0], st.grav[1], st.grav[2]};
+        const float wr[3] = {w[0] * D2R, w[1] * D2R, w[2] * D2R};
+        st.grav[0] += (v[1] * wr[2] - v[2] * wr[1]) * DT;
+        st.grav[1] += (v[2] * wr[0] - v[0] * wr[2]) * DT;
+        st.grav[2] += (v[0] * wr[1] - v[1] * wr[0]) * DT;
+        const float nn = sqrtf(st.grav[0] * st.grav[0] + st.grav[1] * st.grav[1] + st.grav[2] * st.grav[2]);
+        for (int k = 0; k < 3; k++) st.grav[k] /= nn;
+        st.t += DT;
     }
     const FusionVector b = est.bias();
     for (int k = 0; k < 3; k++)
@@ -112,6 +167,13 @@ static Result run(const Sim &sim, MotionFn motion, float seconds, GyroBiasEstima
         r.residual[k] = fabsf(trueBias[k] - b.array[k]);
     }
     return r;
+}
+
+static Result run(const Sim &sim, MotionFn motion, float seconds, GyroBiasEstimator &est)
+{
+    State st;
+    stateInit(st);
+    return run(sim, motion, seconds, est, st);
 }
 
 static const float MAX_DRIFT_DEG_PER_MIN = 2.0f;
@@ -125,7 +187,7 @@ void test_still_constant_offset_10min()
 {
     GyroBiasEstimator est;
     est.begin(GyroBiasDefaultSettings(RATE));
-    const Sim sim = {{1.2f, -0.7f, 1.8f}, {0, 0, 0}, 0.1f};
+    const Sim sim = {{1.2f, -0.7f, 1.8f}, {0, 0, 0}, 0.07f, temp25};
     const Result r = run(sim, still, 600.0f, est);
     for (int k = 0; k < 3; k++)
     {
@@ -134,14 +196,35 @@ void test_still_constant_offset_10min()
     TEST_ASSERT_LESS_THAN_FLOAT(MAX_DRIFT_DEG_PER_MIN, fabsf(r.yawErrLastMin));
 }
 
-// Same with a moving pilot and a warm-up drift of 0.15 deg/s over 10 min on yaw
-// (about the ICM-42670-P ZRO tempco for a 10 degC rise).
+// Same without a temperature sensor (QMI8658C)
+void test_still_constant_offset_no_temperature()
+{
+    GyroBiasEstimator est;
+    est.begin(GyroBiasDefaultSettings(RATE));
+    const Sim sim = {{1.2f, -0.7f, 1.8f}, {0, 0, 0}, 0.07f, noTemp};
+    const Result r = run(sim, still, 600.0f, est);
+    TEST_ASSERT_TRUE(est.bootSampleAccepted());
+    for (int k = 0; k < 3; k++)
+    {
+        TEST_ASSERT_LESS_THAN_FLOAT(MAX_RESIDUAL_DPS, r.residual[k]);
+    }
+}
+
+// warm-up: 25 -> 35 degC over 10 min, i.e. 0.15 deg/s of yaw offset change at
+// the ICM-42670-P tempco (0.015 deg/s/K)
+static float warmup10min(float t) { return 25.0f + 10.0f * (t > 600.0f ? 1.0f : t / 600.0f); }
+
+// Moving pilot (still only in short tremor windows) with the warm-up drift.
+// The pilot is moving at power-on, so the boot calibration times out and the
+// runtime estimate has to find the full offset by itself.
 void test_pilot_motion_with_warmup_10min()
 {
     GyroBiasEstimator est;
     est.begin(GyroBiasDefaultSettings(RATE));
-    const Sim sim = {{0.9f, -1.1f, 1.5f}, {0.005f, -0.005f, 0.015f}, 0.1f};
+    const Sim sim = {{0.9f, -1.1f, 1.5f}, {0.005f, -0.005f, 0.015f}, 0.07f, warmup10min};
     const Result r = run(sim, pilot, 600.0f, est);
+    TEST_ASSERT_FALSE(est.bootSampleAccepted());
+    TEST_ASSERT_TRUE(est.locked());
     for (int k = 0; k < 3; k++)
     {
         TEST_ASSERT_LESS_THAN_FLOAT(MAX_RESIDUAL_DPS, r.residual[k]);
@@ -152,7 +235,7 @@ void test_pilot_motion_with_warmup_10min()
 // Without estimation the same data drifts by 90 deg/min: the test can fail.
 void test_reference_without_estimation_drifts()
 {
-    const Sim sim = {{1.2f, -0.7f, 1.5f}, {0, 0, 0}, 0.1f};
+    const Sim sim = {{1.2f, -0.7f, 1.5f}, {0, 0, 0}, 0.07f, temp25};
     float yaw = 0;
     for (unsigned int i = 0; i < 60 * RATE; i++)
     {
@@ -161,90 +244,168 @@ void test_reference_without_estimation_drifts()
     TEST_ASSERT_GREATER_THAN_FLOAT(MAX_DRIFT_DEG_PER_MIN, fabsf(yaw));
 }
 
-// Boot sample: still from power-on -> accepted after the 2 s window, already accurate.
-void test_boot_sample_still()
+// F1: still from power-on -> 0.2 s discard + 1 s gate + 2 s mean, accurate.
+void test_boot_calibration_still()
 {
     GyroBiasEstimator est;
     est.begin(GyroBiasDefaultSettings(RATE));
-    const Sim sim = {{1.2f, -0.7f, 1.8f}, {0, 0, 0}, 0.1f};
-    const Result r = run(sim, still, 3.0f + 60.0f, est);
+    const Sim sim = {{1.2f, -0.7f, 1.8f}, {0, 0, 0}, 0.07f, temp25};
+    const Result r = run(sim, still, 3.3f, est);
     TEST_ASSERT_TRUE(est.bootSampleAccepted());
-    TEST_ASSERT_EQUAL_UINT(2 * RATE, r.bootDoneAt);
-
-    GyroBiasEstimator est2;
-    est2.begin(GyroBiasDefaultSettings(RATE));
-    rngState = 999u;
-    for (unsigned int i = 0; i < 2 * RATE; i++)
-    {
-        FusionVector g = {{sim.bias[0] + gauss(0.1f), sim.bias[1] + gauss(0.1f), sim.bias[2] + gauss(0.1f)}};
-        est2.update(g);
-    }
-    TEST_ASSERT_TRUE(est2.bootSampleAccepted());
+    TEST_ASSERT_TRUE(est.locked());
+    TEST_ASSERT_EQUAL_UINT(20 + 100 + 200, r.bootDoneAt);
     for (int k = 0; k < 3; k++)
     {
-        TEST_ASSERT_FLOAT_WITHIN(0.05f, sim.bias[k], est2.bias().array[k]);
+        TEST_ASSERT_FLOAT_WITHIN(0.02f, sim.bias[k], est.bias().array[k]);
     }
 }
 
-// Boot sample: board keeps moving -> gives up after the 15 s timeout, runtime
-// estimation still converges once the board is still.
-void test_boot_sample_timeout()
+// F1: board keeps moving -> gives up 10 s after the discard; the runtime
+// estimate (unlocked: 3 deg/s threshold, no step clamp) still converges.
+void test_boot_calibration_timeout()
 {
     GyroBiasEstimator est;
     est.begin(GyroBiasDefaultSettings(RATE));
-    const Sim sim = {{1.0f, 1.0f, -1.0f}, {0, 0, 0}, 0.1f};
+    const Sim sim = {{1.0f, 1.0f, -1.0f}, {0, 0, 0}, 0.07f, temp25};
     const Result r = run(sim, busyBoot, 120.0f, est);
     TEST_ASSERT_TRUE(est.bootSampleDone());
     TEST_ASSERT_FALSE(est.bootSampleAccepted());
-    TEST_ASSERT_EQUAL_UINT(15 * RATE, r.bootDoneAt);
+    TEST_ASSERT_EQUAL_UINT(20 + 1000, r.bootDoneAt);
+    TEST_ASSERT_TRUE(est.locked());
     for (int k = 0; k < 3; k++)
     {
         TEST_ASSERT_LESS_THAN_FLOAT(MAX_RESIDUAL_DPS, r.residual[k]);
     }
 }
 
-// A slow constant turn during the boot window is "still" for the p-p test; the
-// clamp bounds the damage, and the estimate never exceeds it.
-void test_clamp()
-{
-    GyroBiasEstimator est;
-    GyroBiasSettings s = GyroBiasDefaultSettings(RATE);
-    est.begin(s);
-    const Sim sim = {{8.0f, -8.0f, 6.0f}, {0, 0, 0}, 0.1f};
-    run(sim, still, 120.0f, est);
-    TEST_ASSERT_TRUE(est.bootSampleAccepted());
-    for (int k = 0; k < 3; k++)
-    {
-        TEST_ASSERT_TRUE(fabsf(est.bias().array[k]) <= s.maxBiasDps);
-        TEST_ASSERT_FLOAT_WITHIN(1e-4f, s.maxBiasDps, fabsf(est.bias().array[k]));
-    }
-}
-
-// begin() resets everything (used after a new web-UI calibration).
-void test_begin_resets()
+// F1: a noisy (vibrating) board fails the 0.15 deg/s standard deviation gate
+void test_boot_calibration_rejects_noise()
 {
     GyroBiasEstimator est;
     est.begin(GyroBiasDefaultSettings(RATE));
-    const Sim sim = {{1.0f, 1.0f, 1.0f}, {0, 0, 0}, 0.1f};
-    run(sim, still, 63.0f, est);
+    const Sim sim = {{1.0f, 1.0f, -1.0f}, {0, 0, 0}, 0.3f, temp25};
+    const Result r = run(sim, still, 11.0f, est);
+    TEST_ASSERT_TRUE(est.bootSampleDone());
+    TEST_ASSERT_FALSE(est.bootSampleAccepted());
+    TEST_ASSERT_EQUAL_UINT(20 + 1000, r.bootDoneAt);
+}
+
+// F1 sanity check: a still board with a 4 deg/s offset is rejected (above the
+// 3 deg/s limit), and the runtime estimate never sees "still" either (it is
+// above the 3 deg/s threshold), so the stored calibration is kept as is.
+void test_boot_calibration_rejects_large_bias()
+{
+    GyroBiasEstimator est;
+    const GyroBiasSettings s = GyroBiasDefaultSettings(RATE);
+    est.begin(s);
+    const Sim sim = {{4.0f, -0.5f, 0.5f}, {0, 0, 0}, 0.07f, temp25};
+    const Result r = run(sim, still, 120.0f, est);
+    TEST_ASSERT_TRUE(est.bootSampleDone());
+    TEST_ASSERT_FALSE(est.bootSampleAccepted());
+    TEST_ASSERT_EQUAL_UINT(20 + 100 + 200, r.bootDoneAt);
+    TEST_ASSERT_FALSE(est.locked());
+    TEST_ASSERT_TRUE(r.maxAbsBias <= s.maxBiasDps);
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, est.bias().array[0]);
+}
+
+// F2 step clamp: after the boot calibration, a slow steady pan about gravity
+// (0.5 deg/s, below the 1 deg/s threshold, accel unchanged) looks exactly
+// like bias. One episode may absorb at most 0.05 deg/s of it.
+void test_step_clamp_limits_slow_pan()
+{
+    GyroBiasEstimator est;
+    est.begin(GyroBiasDefaultSettings(RATE));
+    const Sim sim = {{0.5f, 0.3f, -0.4f}, {0, 0, 0}, 0.07f, temp25};
+    const Result r = run(sim, slowPan, 70.0f, est);
+    TEST_ASSERT_TRUE(est.bootSampleAccepted());
+    TEST_ASSERT_TRUE(r.residual[2] < 0.05f + 0.02f);
+    // without the clamp the 0.02 Hz low-pass would have absorbed ~0.5 deg/s
+    TEST_ASSERT_TRUE(r.residual[2] > 0.03f);
+}
+
+// F2 accel gate: a slow pitch (0.5 deg/s, below the gyro threshold) turns the
+// gravity vector, so it is not taken as stillness.
+void test_accel_gate_blocks_slow_tilt()
+{
+    GyroBiasEstimator est;
+    est.begin(GyroBiasDefaultSettings(RATE));
+    const Sim sim = {{0.5f, 0.3f, -0.4f}, {0, 0, 0}, 0.07f, temp25};
+    const Result r = run(sim, slowPitch, 70.0f, est);
+    TEST_ASSERT_TRUE(est.bootSampleAccepted());
+    // it stops adapting within the first second of the tilt (0.5 deg) and
+    // never starts again; that first second is bounded by the step clamp
+    TEST_ASSERT_FALSE(est.adapting());
+    TEST_ASSERT_LESS_THAN_FLOAT(0.05f + 0.02f, r.residual[0]);
+}
+
+// begin() resets everything; restartCalibrated() means "residual bias is 0"
+void test_begin_and_restart_calibrated()
+{
+    GyroBiasEstimator est;
+    est.begin(GyroBiasDefaultSettings(RATE));
+    const Sim sim = {{1.0f, 1.0f, 1.0f}, {0, 0, 0}, 0.07f, temp25};
+    run(sim, still, 10.0f, est);
     TEST_ASSERT_TRUE(est.bootSampleAccepted());
     est.begin(GyroBiasDefaultSettings(RATE));
     TEST_ASSERT_FALSE(est.bootSampleDone());
+    TEST_ASSERT_FALSE(est.locked());
     for (int k = 0; k < 3; k++)
     {
         TEST_ASSERT_EQUAL_FLOAT(0.0f, est.bias().array[k]);
     }
+    est.restartCalibrated(30.0f);
+    TEST_ASSERT_TRUE(est.bootSampleDone());
+    TEST_ASSERT_TRUE(est.locked());
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 30.0f, est.temperature());
+}
+
+// StillCalibrator on its own (used by the web "ci" command)
+void test_still_calibrator()
+{
+    GyroBiasSettings s = GyroBiasDefaultSettings(RATE);
+    s.maxBootBiasDps = 30.0f;
+    StillCalibrator cal;
+    cal.begin(s);
+    StillCalibrator::Result res = StillCalibrator::RUNNING;
+    unsigned int i = 0;
+    while (res == StillCalibrator::RUNNING && i < 2000)
+    {
+        FusionVector g = {{7.5f + gauss(0.07f), -2.0f + gauss(0.07f), 0.3f + gauss(0.07f)}};
+        FusionVector a = {{0.0f + gauss(0.001f), 0.0f + gauss(0.001f), 1.0f + gauss(0.001f)}};
+        res = cal.update(g, a);
+        i++;
+    }
+    TEST_ASSERT_EQUAL_INT(StillCalibrator::ACCEPTED, res);
+    TEST_ASSERT_EQUAL_UINT(320, i);
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, 7.5f, cal.mean().axis.x);
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, -2.0f, cal.mean().axis.y);
+
+    // a board lying at 1.1 g (wrong accel scale, or being carried in a lift)
+    cal.begin(s);
+    res = StillCalibrator::RUNNING;
+    for (i = 0; i < 2000 && res == StillCalibrator::RUNNING; i++)
+    {
+        FusionVector g = {{gauss(0.07f), gauss(0.07f), gauss(0.07f)}};
+        FusionVector a = {{0.0f, 0.0f, 1.1f}};
+        res = cal.update(g, a);
+    }
+    TEST_ASSERT_EQUAL_INT(StillCalibrator::TIMED_OUT, res);
 }
 
 int main(int, char **)
 {
     UNITY_BEGIN();
     RUN_TEST(test_still_constant_offset_10min);
+    RUN_TEST(test_still_constant_offset_no_temperature);
     RUN_TEST(test_pilot_motion_with_warmup_10min);
     RUN_TEST(test_reference_without_estimation_drifts);
-    RUN_TEST(test_boot_sample_still);
-    RUN_TEST(test_boot_sample_timeout);
-    RUN_TEST(test_clamp);
-    RUN_TEST(test_begin_resets);
+    RUN_TEST(test_boot_calibration_still);
+    RUN_TEST(test_boot_calibration_timeout);
+    RUN_TEST(test_boot_calibration_rejects_noise);
+    RUN_TEST(test_boot_calibration_rejects_large_bias);
+    RUN_TEST(test_step_clamp_limits_slow_pan);
+    RUN_TEST(test_accel_gate_blocks_slow_tilt);
+    RUN_TEST(test_begin_and_restart_calibrated);
+    RUN_TEST(test_still_calibrator);
     return UNITY_END();
 }

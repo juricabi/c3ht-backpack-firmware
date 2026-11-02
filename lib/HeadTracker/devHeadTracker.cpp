@@ -35,14 +35,31 @@ static int calibrationData[3][2];
 static uint32_t cal_started;
 
 #if defined(HT_GYRO_BIAS_TRACKING)
-// Run-time gyro bias (boot sample + FusionOffset), RAM only: nothing is
-// persisted, so there is no flash wear however often it adapts.
+// Run-time gyro bias (boot calibration + stillness-gated runtime estimate),
+// RAM only: nothing is persisted, so there is no flash wear however often it
+// adapts.
 static GyroBiasEstimator gyroBias;
+static unsigned int gyroBiasRate = 0;
+
+static unsigned int imuRateHz()
+{
+    return (unsigned int)((1.0f / imu->getDeltaTime()) + 0.5f);
+}
 
 static void gyroBiasBegin()
 {
-    const unsigned int rate = (unsigned int)((1.0f / imu->getDeltaTime()) + 0.5f);
-    gyroBias.begin(GyroBiasDefaultSettings(rate));
+    gyroBiasRate = imuRateHz();
+    gyroBias.begin(GyroBiasDefaultSettings(gyroBiasRate));
+}
+
+// After an IMU re-init keep what was learned, unless a different IMU type
+// (data rate) came back.
+static void gyroBiasOnline()
+{
+    if (gyroBiasRate != imuRateHz())
+    {
+        gyroBiasBegin();
+    }
 }
 #endif
 
@@ -162,7 +179,7 @@ static void imuOnline()
 {
     imu->setCalibration(config.GetIMUCalibration());
 #if defined(HT_GYRO_BIAS_TRACKING)
-    gyroBiasBegin();
+    gyroBiasOnline();
 #endif
 #if defined(HT_MEASURED_SAMPLE_PERIOD)
     samplePeriod.begin(imu->getDeltaTime());
@@ -315,7 +332,7 @@ static int timeout()
         case STATE_RUNNING: {
 #if defined(HT_GYRO_BIAS_TRACKING)
             // sensor frame, after the stored calibration, before the board rotation
-            g = gyroBias.update(g);
+            g = gyroBias.update(g, a, imu->getTemperature());
 #endif
             rotate(a.array, orientation);
             rotate(g.array, orientation);
