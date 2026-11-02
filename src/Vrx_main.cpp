@@ -399,7 +399,7 @@ void sendMSPViaEspnow(mspPacket_t *packet)
     return;
 
   uint8_t packetSize = msp.getTotalPacketSize(packet);
-#if defined(C3HT_EU_BUILD)
+#if defined(MSP_BOUNDS_CHECK)
   if (packetSize == 0)
     return; // oversized packet (see MSP bounds fix)
 #endif
