@@ -131,8 +131,14 @@ MSPModuleBase::Loop(uint32_t now)
                     else if (packet->payload[0] == 'W')
                     {
                         DBGLN("Enter WIFI mode...");
+#if defined(C3HT_EU_BUILD)
+                        // EU: wired goggle menu = user intent. Reboot into AP mode so ESP-NOW is
+                        // torn down cleanly; refused (LED pattern) without a device credential.
+                        RebootIntoWifi();
+#else
                         connectionState = wifiUpdate;
                         devicesTriggerEvent();
+#endif
                     }
                     // send "in-progress" response
                     sendResponse(MSP_ELRS_BACKPACK_SET_MODE, (const uint8_t *)"P", 1);

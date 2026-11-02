@@ -6,3 +6,10 @@ __pycache__
 *.pyc
 include/WebContent.h
 super_defines.txt
+
+# C3HT EU build: generated headers and keys (public keys are generated into include/, never private keys)
+include/WebContentEU.h
+include/c3ht_eu_pubkeys.h
+eu_keys/
+*priv*.pem
+*_priv.pem

@@ -24,6 +24,9 @@
 #include "devButton.h"
 #include "devLED.h"
 #include "devHeadTracker.h"
+#if defined(C3HT_EU_BUILD)
+  #include "c3ht_eu.h"
+#endif
 
 #ifdef RAPIDFIRE_BACKPACK
   #include "rapidfire.h"
@@ -137,6 +140,11 @@ void SetupEspNow();
 
 void RebootIntoWifi(wifi_service_t service = WIFI_SERVICE_UPDATE)
 {
+#if defined(C3HT_EU_BUILD)
+  // EU: the AP never starts without a per-device credential (LED shows why)
+  if (!euWifiAllowed("reboot"))
+    return;
+#endif
   DBGLN("Rebooting into wifi update mode...");
   config.SetStartWiFiOnBoot(true);
   config.SetBootCount(0);
@@ -151,6 +159,11 @@ void OnDataRecv(uint8_t * mac_addr, uint8_t *data, uint8_t data_len)
 void OnDataRecv(const uint8_t * mac_addr, const uint8_t *data, int data_len)
 #endif
 {
+#if defined(C3HT_EU_BUILD)
+  // EU: MAC filter BEFORE the MSP parser; frames from other senders are never parsed
+  if (connectionState != binding && memcmp(mac_addr, firmwareOptions.uid, 6) != 0)
+    return;
+#endif
   MSP recv_msp;
   DBGVLN("ESP NOW DATA:");
   for(int i = 0; i < data_len; i++)
@@ -177,7 +190,11 @@ void OnDataRecv(const uint8_t * mac_addr, const uint8_t *data, int data_len)
         #if defined(PLATFORM_ESP8266)
           ProcessMSPPacket(recv_msp.getReceivedPacket());
         #elif defined(PLATFORM_ESP32)
+        #if defined(C3HT_EU_BUILD)
+          xQueueSend(rxqueue, recv_msp.getReceivedPacket(), 0); // drop on overflow, never block the Wi-Fi task
+        #else
           xQueueSend(rxqueue, recv_msp.getReceivedPacket(), (TickType_t)1024);
+        #endif
         #endif
       }
       else
@@ -229,7 +246,12 @@ void ProcessMSPPacket(mspPacket_t *packet)
     break;
   case MSP_ELRS_SET_VRX_BACKPACK_WIFI_MODE:
     DBGLN("Processing MSP_ELRS_SET_VRX_BACKPACK_WIFI_MODE...");
+#if defined(C3HT_EU_BUILD)
+    // EU: unauthenticated radio command -> LED prompt only; BOOT press starts Wi-Fi
+    euRemoteWifiRequest();
+#else
     RebootIntoWifi();
+#endif
     break;
   case MSP_ELRS_BACKPACK_SET_RECORDING_STATE:
     DBGLN("Processing MSP_ELRS_BACKPACK_SET_RECORDING_STATE...");
@@ -278,8 +300,16 @@ void ProcessMSPPacket(mspPacket_t *packet)
   }
 }
 
+#if defined(C3HT_EU_BUILD)
+static bool euRadioOk = true;
+#endif
+
 void SetupEspNow()
 {
+#if defined(C3HT_EU_BUILD)
+  if (!euRadioOk)
+    return; // TX power cap could not be verified: radio stays off (fail closed)
+#endif
   if (esp_now_init() != 0)
     {
       DBGLN("Error initializing ESP-NOW");
@@ -302,6 +332,9 @@ void SetupEspNow()
     #endif
 
     esp_now_register_recv_cb(OnDataRecv);
+#if defined(C3HT_EU_BUILD)
+    euNoteRadioUp();
+#endif
 }
 
 void SetSoftMACAddress()
@@ -322,6 +355,11 @@ void SetSoftMACAddress()
   firmwareOptions.uid[0] = firmwareOptions.uid[0] & ~0x01;
 
   WiFi.mode(WIFI_STA);
+#if defined(C3HT_EU_BUILD)
+  // EU: 2 dBm cap applied + read back before anything is sent, no LR, channel 1
+  // without the fake WiFi.begin() (which sent probe requests)
+  euRadioOk = euEspNowRadioSetup();
+#else
   #if defined(PLATFORM_ESP8266)
     WiFi.setOutputPower(20.5);
   #elif defined(PLATFORM_ESP32)
@@ -330,6 +368,7 @@ void SetSoftMACAddress()
   #endif
   WiFi.begin("network-name", "pass-to-network", 1);
   WiFi.disconnect();
+#endif
 
   // Soft-set the MAC address to the passphrase UID for binding
   #if defined(PLATFORM_ESP8266)
@@ -360,6 +399,10 @@ void sendMSPViaEspnow(mspPacket_t *packet)
     return;
 
   uint8_t packetSize = msp.getTotalPacketSize(packet);
+#if defined(C3HT_EU_BUILD)
+  if (packetSize == 0)
+    return; // oversized packet (see MSP bounds fix)
+#endif
   uint8_t nowDataOutput[packetSize];
 
   uint8_t result = msp.convertToByteArray(packet, nowDataOutput);
@@ -435,6 +478,9 @@ RF_PRE_INIT()
 
 void setup()
 {
+#if defined(C3HT_EU_BUILD)
+  euEarlySetup();
+#endif
   #if !defined(HDZERO_BACKPACK)
     // Serial.begin() seems to prevent the HDZ VRX from booting
     // If we're not on HDZ, init serial early for debug msgs
@@ -447,6 +493,14 @@ void setup()
   eeprom.Begin();
   config.SetStorageProvider(&eeprom);
   config.Load();
+#if defined(C3HT_EU_BUILD)
+  euAfterConfigLoad();
+  if (config.GetStartWiFiOnBoot() && !euCredPresent())
+  {
+    config.SetStartWiFiOnBoot(false); // no credential: no AP, normal ESP-NOW mode
+    config.Commit();
+  }
+#endif
 
   devicesInit(ui_devices, ARRAY_SIZE(ui_devices));
 
@@ -488,6 +542,9 @@ void loop()
   uint32_t now = millis();
 
   devicesUpdate(now);
+#if defined(C3HT_EU_BUILD)
+  euLoop(now);
+#endif
   vrxModule.Loop(now);
 
   #if defined(PLATFORM_ESP8266)
@@ -507,8 +564,8 @@ void loop()
   if (BindingExpired(now))
   {
     DBGLN("Binding expired");
-#if !defined(NO_AUTOBIND)
-    RebootIntoWifi();
+#if !defined(NO_AUTOBIND) && !defined(C3HT_EU_BUILD)
+    RebootIntoWifi(); // EU: binding expiry never starts Wi-Fi
 #else
     connectionState = running;
 #endif

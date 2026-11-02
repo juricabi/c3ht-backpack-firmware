@@ -79,6 +79,7 @@ bool options_HasStringInFlash(EspFlashStream &strmFlash)
     return firstBytes != 0xffffffff;
 }
 
+#if !defined(C3HT_EU_BUILD)
 /**
  * @brief:  Internal read options from either the flash stream at the end of the sketch or the options.json file
  *          Fills the firmwareOptions variable
@@ -143,7 +144,57 @@ static void options_LoadFromFlashOrFile(EspFlashStream &strmFlash)
     builtinOptions.clear();
     saveOptions(builtinOptions, doc["customised"] | false);
 }
+#endif // !C3HT_EU_BUILD
 
+#if defined(C3HT_EU_BUILD)
+/*
+ * EU build: the options block after the image is NOT covered by the update
+ * signature (the ELRS Configurator re-patches it), so it is untrusted input.
+ * Only uid (6 bytes), product-name (printable, bounded) and
+ * flash-discriminator are used. Home Wi-Fi keys are ignored and SPIFFS
+ * /options.json is never read (the EU partition table has no SPIFFS).
+ */
+bool options_init()
+{
+    memset(&firmwareOptions, 0, sizeof(firmwareOptions));
+    flash_discriminator = 0;
+    const esp_partition_t *runningPart = esp_ota_get_running_partition();
+    EspFlashStream strmFlash;
+    strmFlash.setBaseAddress((runningPart ? runningPart->address : 0) + ESP.getSketchSize());
+    strmFlash.setPosition(0);
+    JsonDocument doc;
+    if (options_HasStringInFlash(strmFlash))
+    {
+        if (deserializeJson(doc, strmFlash, DeserializationOption::NestingLimit(2)))
+            doc.clear();
+    }
+    JsonArray uid = doc["uid"].as<JsonArray>();
+    if (!uid.isNull() && uid.size() == 6)
+    {
+        bool ok = true;
+        for (size_t i = 0; i < 6; i++)
+        {
+            int v = uid[i] | -1;
+            if (v < 0 || v > 255)
+                ok = false;
+            else
+                firmwareOptions.uid[i] = (uint8_t)v;
+        }
+        firmwareOptions.hasUID = ok;
+        if (!ok)
+            memset(firmwareOptions.uid, 0, sizeof(firmwareOptions.uid));
+    }
+    const char *pn = doc["product-name"] | "";
+    size_t n = 0;
+    for (; pn[n] && n < sizeof(firmwareOptions.product_name) - 1; n++)
+        firmwareOptions.product_name[n] = (pn[n] >= 0x20 && pn[n] < 0x7f && pn[n] != '"' && pn[n] != '<' && pn[n] != '>') ? pn[n] : '_';
+    firmwareOptions.product_name[n] = 0;
+    flash_discriminator = doc["flash-discriminator"] | 0U;
+    builtinOptions.clear();
+    saveOptions(builtinOptions, false);
+    return true;
+}
+#else
 bool options_init()
 {
     uint32_t baseAddr = 0;
@@ -170,3 +221,4 @@ bool options_init()
 
     return true; //hasHardware;
 }
+#endif

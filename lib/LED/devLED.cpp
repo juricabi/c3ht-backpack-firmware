@@ -28,8 +28,19 @@ static const uint8_t *_durations;
 static uint8_t _count;
 static uint8_t _counter = 0;
 
+#if defined(C3HT_EU_BUILD)
+// EU build: temporary patterns (no credential, Wi-Fi prompt, reset countdown).
+static const uint8_t *euSeq = nullptr;
+static uint8_t euCount = 0;
+static uint32_t euUntil = 0;
+#endif
+
 static uint16_t updateLED()
 {
+#if defined(C3HT_EU_BUILD)
+    if (!_durations)
+        return 100;
+#endif
     if(_counter % 2 == 1)
         digitalWrite(_pin, LOW ^ _pin_inverted);
     else
@@ -56,8 +67,20 @@ static void initialize()
     digitalWrite(PIN_LED, HIGH ^ _pin_inverted);
 }
 
+static int event();
+
 static int timeout()
 {
+#if defined(C3HT_EU_BUILD)
+    if (euSeq && (int32_t)(millis() - euUntil) >= 0)
+    {
+        euSeq = nullptr;
+        digitalWrite(PIN_LED, HIGH ^ _pin_inverted);
+        return event();
+    }
+    if (euSeq)
+        return updateLED();
+#endif
     if (connectionState == running && blipLED)
     {
         blipLED = false;
@@ -69,6 +92,15 @@ static int timeout()
 
 static int event()
 {
+#if defined(C3HT_EU_BUILD)
+    if (euSeq && (int32_t)(millis() - euUntil) < 0)
+    {
+        blipLED = false;
+        if (_durations != euSeq)
+            return flashLED(PIN_LED, euSeq, euCount);
+        return DURATION_IGNORE;
+    }
+#endif
     if (connectionState == running && blipLED)
     {
         digitalWrite(PIN_LED, LOW ^ _pin_inverted);
@@ -84,6 +116,17 @@ static int event()
     }
     return DURATION_NEVER;
 }
+
+#if defined(C3HT_EU_BUILD)
+void ledShowPattern(const uint8_t *seq, uint8_t count, uint32_t durationMs)
+{
+    euSeq = seq;
+    euCount = count;
+    euUntil = millis() + durationMs;
+    _durations = nullptr;   // force event() to (re)start the sequence
+    devicesTriggerEvent();
+}
+#endif
 
 void turnOffLED()
 {

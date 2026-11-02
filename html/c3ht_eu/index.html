@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>C3HT settings</title>
+	<link rel="stylesheet" href="eu.css">
+</head>
+<body>
+	<header>
+		<h1>C3HT</h1>
+		<div id="hdr-info">VRx backpack with head tracker &middot; firmware @VERSION@</div>
+	</header>
+
+	<main>
+		<section id="login" class="card hidden">
+			<h2>Log in</h2>
+			<p>Enter the device password from your card (or the password you set).</p>
+			<form id="login-form" autocomplete="off">
+				<input id="login-pw" type="password" autocomplete="current-password" placeholder="Device password" maxlength="64" required>
+				<button type="submit">Log in</button>
+			</form>
+			<p id="login-msg" class="msg"></p>
+		</section>
+
+		<div id="app" class="hidden">
+			<div id="banner-default" class="banner hidden">
+				You are using the password printed on the card. Anyone who has seen the card can log in.
+				You can set your own password below (recommended: <b>Generate</b>).
+			</div>
+			<nav>
+				<button data-tab="tab-status" class="active">Status</button>
+				<button data-tab="tab-ht">Head tracking</button>
+				<button data-tab="tab-update">Update</button>
+				<button data-tab="tab-security">Security</button>
+			</nav>
+
+			<section id="tab-status" class="card tab">
+				<h2>Status</h2>
+				<table id="info"></table>
+				<p class="hint">Wi-Fi switches off automatically (<span id="ap-left">-</span> s left).
+					It starts again only when you press BOOT or choose "VRx Wi-Fi" and then press BOOT.</p>
+				<button id="btn-stop">Stop Wi-Fi now</button>
+				<button id="btn-logout" class="secondary">Log out</button>
+			</section>
+
+			<section id="tab-ht" class="card tab hidden">
+				<h2>Head tracking</h2>
+				<p><button id="set-center">Reset center</button> <button id="cal-gyro">Calibrate gyro</button></p>
+				<div id="canvas-holder"></div>
+				<p class="mono">pitch <span id="angle-x">-</span> &middot; roll <span id="angle-y">-</span> &middot; yaw <span id="angle-z">-</span></p>
+				<h3>Board orientation</h3>
+				<p class="hint">Rotate from flat, level and pointing away from you: first pitch (back is positive), then roll (right is positive), then yaw (left is positive).</p>
+				<label>Pitch <span id="label-x">0</span><input id="x-angle" type="range" min="-180" max="180" value="0"></label>
+				<label>Roll <span id="label-y">0</span><input id="y-angle" type="range" min="-180" max="180" value="0"></label>
+				<label>Yaw <span id="label-z">0</span><input id="z-angle" type="range" min="-180" max="180" value="0"></label>
+				<p><button id="reset-board">Reset orientation</button> <button id="save-orientation">Save orientation</button></p>
+				<p id="ht-msg" class="msg"></p>
+			</section>
+
+			<section id="tab-update" class="card tab hidden">
+				<h2>Firmware update</h2>
+				<p>Only firmware signed for this device type is accepted (<span id="upd-target">-</span>).
+					Unsigned or modified files are rejected. You can always install any firmware, including
+					your own build, over USB (see the manual).</p>
+				<input id="fw-file" type="file" accept=".bin">
+				<label class="inline"><input id="fw-xtarget" type="checkbox"> Allow firmware for a different goggle type</label>
+				<p><button id="btn-upload">Upload signed firmware</button></p>
+				<progress id="fw-progress" value="0" max="100"></progress>
+				<p id="upd-msg" class="msg"></p>
+			</section>
+
+			<section id="tab-security" class="card tab hidden">
+				<h2>Device password</h2>
+				<p class="hint">One password is used for the Wi-Fi network and for this page. A new password takes
+					effect the next time Wi-Fi starts; your phone will ask for it then. Holding BOOT for 10 seconds
+					brings back the card password.</p>
+				<form id="pw-form" autocomplete="off">
+					<input id="pw-cur" type="password" placeholder="Current password" maxlength="64" required>
+					<input id="pw-new" type="password" placeholder="New password (16 to 63 characters)" maxlength="63">
+					<button type="submit">Set this password</button>
+					<button type="button" id="pw-gen">Generate a random password</button>
+				</form>
+				<p id="pw-msg" class="msg"></p>
+
+				<h2>Security log</h2>
+				<table id="events"></table>
+
+				<h2>Factory reset</h2>
+				<p class="hint">Erases your password, binding, IMU calibration and the log. The card password works again afterwards.</p>
+				<form id="fr-form" autocomplete="off">
+					<input id="fr-cur" type="password" placeholder="Current password" maxlength="64" required>
+					<button type="submit" class="danger">Factory reset</button>
+				</form>
+				<p id="fr-msg" class="msg"></p>
+				<p class="hint">Report security problems: see the contact in the manual and on the card.
+					Firmware: ExpressLRS Backpack based, GPL-3.0.</p>
+			</section>
+		</div>
+	</main>
+	<script src="eu.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# C3HT EU build partition table (4 MB flash). App slots are identical to min_spiffs.csv.
+# 'fctry' (NVS) comes AFTER 'nvs': Arduino's initArduino() only ever formats the first
+# NVS partition, so user password, anti-rollback counter and the security log survive.
+# 'c3cred' (raw, subtype 0x40) holds the credential record for flash-provisioned units
+# (Atto/maker), the USB re-key override record and the optional user OTA public key.
+# No SPIFFS: the EU build ignores /options.json.
+# Name,   Type, SubType,  Offset,   Size,     Flags
+nvs,      data, nvs,      0x9000,   0x5000,
+otadata,  data, ota,      0xe000,   0x2000,
+app0,     app,  ota_0,    0x10000,  0x1E0000,
+app1,     app,  ota_1,    0x1F0000, 0x1E0000,
+fctry,    data, nvs,      0x3D0000, 0x10000,
+c3cred,   data, 0x40,     0x3E0000, 0x1000,
+coredump, data, coredump, 0x3F0000, 0x10000,

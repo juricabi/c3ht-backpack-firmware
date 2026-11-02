@@ -3,7 +3,8 @@
 #include "devWIFI.h"
 #include "devwifi_proxies.h"
 
-#if defined(PLATFORM_ESP8266) || defined(PLATFORM_ESP32)
+// C3HT EU build: this whole file is replaced by lib/C3HT_EU/src/eu_web.cpp
+#if (defined(PLATFORM_ESP8266) || defined(PLATFORM_ESP32)) && !defined(C3HT_EU_BUILD)
 
 #if defined(PLATFORM_ESP32)
 #include <WiFi.h>
