@@ -524,6 +524,12 @@
                 "firmware": "Fusion_Builtin_Backpack",
                 "upload_methods": ["uart", "wifi"],
                 "platform": "esp8285"
+            },
+            "c3ht": {
+                "product_name": "C3HT Head Tracker Backpack",
+                "firmware": "C3HT_Fusion",
+                "upload_methods": ["uart", "wifi"],
+                "platform": "esp32-c3"
             }
         }
     },
@@ -615,6 +621,12 @@
                 "firmware": "Rapidfire_HappyModel_EP82_VRX_Backpack",
                 "upload_methods": ["uart", "wifi"],
                 "platform": "esp8285"
+            },
+            "c3ht": {
+                "product_name": "C3HT Head Tracker Backpack",
+                "firmware": "C3HT_Rapidfire",
+                "upload_methods": ["uart", "wifi"],
+                "platform": "esp32-c3"
             }
         }
     },
@@ -644,6 +656,12 @@
                 "firmware": "RX5808_HappyModel_EP82_VRX_Backpack",
                 "upload_methods": ["uart", "wifi"],
                 "platform": "esp8285"
+            },
+            "c3ht": {
+                "product_name": "C3HT Head Tracker Backpack",
+                "firmware": "C3HT_RX5808",
+                "upload_methods": ["uart", "wifi"],
+                "platform": "esp32-c3"
             }
         }
     },
@@ -655,6 +673,12 @@
                 "firmware": "RX5808_Diversity_ESP01F_Backpack",
                 "upload_methods": ["uart", "wifi"],
                 "platform": "esp8285"
+            },
+            "c3ht": {
+                "product_name": "C3HT Head Tracker Backpack",
+                "firmware": "C3HT_RX5808",
+                "upload_methods": ["uart", "wifi"],
+                "platform": "esp32-c3"
             }
         }
     },
@@ -684,6 +708,18 @@
                 "firmware": "Skyzone_SteadyView_HappyModel_EP82_VRX_Backpack",
                 "upload_methods": ["uart", "wifi"],
                 "platform": "esp8285"
+            },
+            "c3ht": {
+                "product_name": "C3HT Head Tracker Backpack, SPI (DIY)",
+                "firmware": "C3HT_SteadyView",
+                "upload_methods": ["uart", "wifi"],
+                "platform": "esp32-c3"
+            },
+            "c3ht-msp": {
+                "product_name": "C3HT Head Tracker Backpack, MSP (DIY)",
+                "firmware": "C3HT_SkyzoneMSP",
+                "upload_methods": ["uart", "wifi"],
+                "platform": "esp32-c3"
             }
         }
     },
@@ -707,6 +743,12 @@
                 "firmware": "Orqa_HappyModel_EP82_VRX_Backpack",
                 "upload_methods": ["uart", "wifi"],
                 "platform": "esp8285"
+            },
+            "c3ht": {
+                "product_name": "C3HT Head Tracker Backpack",
+                "firmware": "C3HT_Orqa",
+                "upload_methods": ["uart", "wifi"],
+                "platform": "esp32-c3"
             }
         }
     },
