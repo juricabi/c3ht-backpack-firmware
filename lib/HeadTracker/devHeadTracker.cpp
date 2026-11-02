@@ -18,6 +18,10 @@
 #if defined(HT_GYRO_BIAS_TRACKING)
 #include "GyroBias.h"
 #endif
+#if defined(HT_MEASURED_SAMPLE_PERIOD)
+#include "SamplePeriod.h"
+static SamplePeriod samplePeriod;
+#endif
 
 static HeadTrackerState ht_state = STATE_ERROR;
 static IMUBase *imu;
@@ -160,6 +164,9 @@ static void imuOnline()
 #if defined(HT_GYRO_BIAS_TRACKING)
     gyroBiasBegin();
 #endif
+#if defined(HT_MEASURED_SAMPLE_PERIOD)
+    samplePeriod.begin(imu->getDeltaTime());
+#endif
     lastSampleMs = millis();
     retryDelayMs = IMU_RETRY_MIN_MS;
     ht_state = STATE_RUNNING;
@@ -282,8 +289,6 @@ static int timeout()
     if (imu == nullptr || ht_state == STATE_ERROR) {
         return recoverIMU();
     }
-    const float deltaTime = imu->getDeltaTime();
-
     if (!imu->readIMUData(a, g)) {
         if (millis() - lastSampleMs > IMU_STALL_TIMEOUT_MS) {
             return recoverIMU();
@@ -291,6 +296,20 @@ static int timeout()
         return DURATION_IMMEDIATELY;
     }
     lastSampleMs = millis();
+#if defined(HT_MEASURED_SAMPLE_PERIOD)
+    const float deltaTime = samplePeriod.update(imu->getSampleTimeUs());
+#if defined(DEBUG_LOG)
+    static uint32_t lastMissed = 0, lastMissedLogMs = 0;
+    if (samplePeriod.missedSamples() != lastMissed && lastSampleMs - lastMissedLogMs > 10000) {
+        lastMissed = samplePeriod.missedSamples();
+        lastMissedLogMs = lastSampleMs;
+        DBGLN("IMU period %d us, missed %u samples in %u gaps", (int)(samplePeriod.period() * 1e6f),
+              (unsigned)samplePeriod.missedSamples(), (unsigned)samplePeriod.gaps());
+    }
+#endif
+#else
+    const float deltaTime = imu->getDeltaTime();
+#endif
 
     switch (ht_state) {
         case STATE_RUNNING: {

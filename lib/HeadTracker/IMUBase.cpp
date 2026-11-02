@@ -14,8 +14,10 @@ static float ITerm[3] = {0 ,0, 0};
 static int c, L;
 
 static volatile bool irq_received;
+static volatile uint32_t irq_time_us;
 
 static IRAM_ATTR void irq_handler() {
+    irq_time_us = micros();
     irq_received = true;
 }
 
@@ -56,9 +58,11 @@ uint8_t IMUBase::readBuffer(uint8_t reg, uint8_t *buffer, int length) {
 bool IMUBase::readIMUData(FusionVector &accel, FusionVector &gyro) {
     bool hasData = irq_received;
     if (!hasData) return false;
+    const uint32_t irqTime = irq_time_us;
     if (!getDataFromRegisters(accel, gyro)) {
         return false;
     }
+    sampleTimeUs = irqTime;
     gyro.axis.x += imuCalibration[0];
     gyro.axis.y += imuCalibration[1];
     gyro.axis.z += imuCalibration[2];

@@ -20,6 +20,8 @@ public:
     const float *getCalibration();
 
     float getDeltaTime() const { return deltaTime; }
+    // micros() of the data-ready interrupt of the sample last returned by readIMUData()
+    uint32_t getSampleTimeUs() const { return sampleTimeUs; }
     float getGyroRange() const { return gyroRange; }
 
 protected:
@@ -27,6 +29,7 @@ protected:
     float deltaTime = 0.0f;
     float gyroRange;
     float gRes = 0;
+    uint32_t sampleTimeUs = 0;
 
     explicit IMUBase(int _address) : address(_address) {}
 
