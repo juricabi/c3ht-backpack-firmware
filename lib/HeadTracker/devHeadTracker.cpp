@@ -241,7 +241,10 @@ static int start()
 // The IMU stopped producing samples (e.g. it was reset by a supply dip and
 // lost its configuration, or it holds SDA low) or was never found: clear
 // the bus and probe again, backing off while it keeps failing. The AHRS
-// state, orientation and centre are kept so a recovered IMU carries on.
+// state, orientation and centre are kept so a recovered IMU carries on,
+// but the output angles are centred meanwhile: a gimbal must not stay
+// frozen at the last head angle for the whole retry period (up to 30 s
+// per attempt), and "sc" in that time must not move the centre.
 static int recoverIMU()
 {
     if (imu != nullptr)
@@ -250,6 +253,9 @@ static int recoverIMU()
         dropIMU();
     }
     ht_state = STATE_ERROR;
+    euler.angle.roll = 0.0f;
+    euler.angle.pitch = 0.0f;
+    euler.angle.yaw = 0.0f;
     i2cRestart();
     if (probeIMU())
     {
