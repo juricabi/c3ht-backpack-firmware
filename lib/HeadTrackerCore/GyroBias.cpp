@@ -226,6 +226,7 @@ void GyroBiasEstimator::begin(const GyroBiasSettings &settings)
 
     m_tempValid = false;
     m_temp = 0.0f;
+    m_model.reset();
 }
 
 void GyroBiasEstimator::restartCalibrated(float temperatureC)
@@ -268,11 +269,21 @@ void GyroBiasEstimator::acceptEstimate()
     m_anchor = m_bias;
     m_anchorTemp = m_temp;
     m_locked = true;
+    if (m_tempValid)
+    {
+        m_model.add(m_temp, m_bias);
+    }
 }
 
+// Bias to apply while not adapting: the last estimate, moved along the
+// learned bias-vs-temperature curve to the current temperature.
 FusionVector GyroBiasEstimator::modelBias() const
 {
-    return m_anchor;
+    if (!m_tempValid)
+    {
+        return m_anchor;
+    }
+    return FusionVectorAdd(m_anchor, m_model.delta(m_anchorTemp, m_temp));
 }
 
 bool GyroBiasEstimator::accelStill(const FusionVector &accel) const
@@ -320,9 +331,17 @@ FusionVector GyroBiasEstimator::update(FusionVector gyro, const FusionVector &ac
     {
         if (m_active)
         {
-            // end of an adapting episode: keep what it learned
-            m_anchor = m_bias;
-            m_anchorTemp = m_temp;
+            // end of an adapting episode: keep what it learned; once
+            // converged (locked) it is also a point of the temperature curve
+            if (m_locked)
+            {
+                acceptEstimate();
+            }
+            else
+            {
+                m_anchor = m_bias;
+                m_anchorTemp = m_temp;
+            }
         }
         m_active = false;
         m_timer = 0;

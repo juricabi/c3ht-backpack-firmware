@@ -23,12 +23,17 @@
 //     because a gyro cannot tell a slow steady head turn from bias. Before
 //     that (boot calibration failed) it runs like FusionOffset: 3 deg/s
 //     threshold and no step clamp, until 25 s of still time have converged it.
+//  F3 temperature compensation (BiasTempModel): every accepted estimate is
+//     stored against the 1 s EMA of the die temperature; while the head is
+//     moving the applied bias follows the learned bias-vs-temperature curve
+//     from the last estimate on.
 //  The total estimate is clamped per axis. Nothing is written to flash.
 //
 // Plain C++ with no Arduino dependency, so it can be unit tested on the host
 // (test/test_gyro_bias).
 
 #include "Fusion.h"     // wraps the Fusion C headers in extern "C"
+#include "BiasTempModel.h"
 
 struct GyroBiasSettings
 {
@@ -118,6 +123,7 @@ public:
     bool locked() const { return m_locked; }
     bool adapting() const { return m_active; }
     float temperature() const { return m_temp; }
+    const BiasTempModel &temperatureModel() const { return m_model; }
 
 private:
     void acceptEstimate();
@@ -150,4 +156,5 @@ private:
 
     bool m_tempValid;
     float m_temp;               // 1 s EMA of the die temperature
+    BiasTempModel m_model;
 };

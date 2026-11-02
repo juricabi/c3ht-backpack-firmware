@@ -38,6 +38,7 @@ struct Sim
     float tempco[3];        // true offset change (deg/s per K)
     float noise;            // gyro white noise sigma (deg/s)
     TempFn temp;
+    bool hideTemp;          // the bias follows temp, but the estimator gets NAN
 };
 
 // head motion: returns the true angular rate (deg/s) at time t
@@ -137,7 +138,8 @@ static Result run(const Sim &sim, MotionFn motion, float seconds, GyroBiasEstima
             a.array[k] = st.grav[k] + gauss(0.001f);
         }
         const bool wasDone = est.bootSampleDone();
-        const FusionVector c = est.update(g, a, isnan(T) ? T : T + gauss(0.02f));
+        const float Tfeed = (sim.hideTemp || isnan(T)) ? NAN : T + gauss(0.02f);
+        const FusionVector c = est.update(g, a, Tfeed);
         if (!wasDone && est.bootSampleDone())
         {
             r.bootDoneAt = i + 1;
@@ -392,6 +394,87 @@ void test_still_calibrator()
     TEST_ASSERT_EQUAL_INT(StillCalibrator::TIMED_OUT, res);
 }
 
+// F3 scenario: still at 25 degC (boot), 5 min of continuous motion while the
+// goggles warm to 35 degC, 1 min still at 35 degC, then 5 min of continuous
+// motion while they warm to 40 degC. In the last phase nothing is still, so
+// only the learned bias-vs-temperature curve can follow the yaw offset
+// (0.015 deg/s/K * 5 K = 0.075 deg/s, 4.5 deg/min).
+static float f3Temp(float t)
+{
+    if (t < 30.0f) return 25.0f;
+    if (t < 330.0f) return 25.0f + 10.0f * (t - 30.0f) / 300.0f;
+    if (t < 390.0f) return 35.0f;
+    if (t < 690.0f) return 35.0f + 5.0f * (t - 390.0f) / 300.0f;
+    return 40.0f;
+}
+static void f3Motion(float t, float out[3])
+{
+    if (t < 30.0f || (t >= 330.0f && t < 390.0f))
+    {
+        still(t, out);
+        return;
+    }
+    out[0] = 20.0f * sinf(2 * PI_F * 0.21f * t);
+    out[1] = 15.0f * sinf(2 * PI_F * 0.13f * t + 1.0f);
+    out[2] = 30.0f * sinf(2 * PI_F * 0.17f * t + 2.0f);
+}
+
+void test_temperature_compensation_warmup()
+{
+    const Sim sim = {{0.8f, -0.6f, 1.1f}, {0.005f, -0.008f, 0.015f}, 0.07f, f3Temp};
+    GyroBiasEstimator est;
+    est.begin(GyroBiasDefaultSettings(RATE));
+    const Result r = run(sim, f3Motion, 690.0f, est);
+    TEST_ASSERT_TRUE(est.bootSampleAccepted());
+    TEST_ASSERT_EQUAL_INT(2, est.temperatureModel().filledBins());
+    TEST_ASSERT_FLOAT_WITHIN(0.003f, 0.015f, est.temperatureModel().slope(37.5f).axis.z);
+
+    // the same data without a temperature reading (F2 alone)
+    Sim simNoT = sim;
+    simNoT.hideTemp = true;
+    GyroBiasEstimator ref;
+    ref.begin(GyroBiasDefaultSettings(RATE));
+    rngState = 12345u;
+    const Result rr = run(simNoT, f3Motion, 690.0f, ref);
+    const float refResidual = rr.residual[2];
+
+    // F2 alone is left 0.075 deg/s off; F3 must remove at least 70% of it
+    TEST_ASSERT_GREATER_THAN_FLOAT(0.06f, refResidual);
+    TEST_ASSERT_LESS_THAN_FLOAT(0.3f * 0.075f, r.residual[2]);
+    TEST_ASSERT_LESS_THAN_FLOAT(0.3f * 0.04f, r.residual[1]);
+}
+
+void test_temperature_model()
+{
+    BiasTempModel m;
+    FusionVector b = {{1.0f, 2.0f, 3.0f}};
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, m.delta(20.0f, 40.0f).axis.x);     // empty
+    m.add(25.0f, b);
+    TEST_ASSERT_EQUAL_INT(1, m.filledBins());
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, m.delta(20.0f, 40.0f).axis.z);     // one bin: constant
+    FusionVector b2 = {{1.1f, 2.0f, 4.0f}};
+    m.add(35.0f, b2);
+    TEST_ASSERT_EQUAL_INT(2, m.filledBins());
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0.1f, m.delta(25.0f, 35.0f).axis.x);    // 0.01/K
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0.05f, m.delta(25.0f, 30.0f).axis.x);   // interpolated
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0.15f, m.delta(25.0f, 40.0f).axis.x);   // extended past the last bin
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, -0.05f, m.delta(25.0f, 20.0f).axis.x);  // and below the first
+    TEST_ASSERT_FLOAT_WITHIN(1e-4f, 0.5f, m.delta(25.0f, 35.0f).axis.z);    // 0.1/K clamped to 0.05/K
+    TEST_ASSERT_FLOAT_WITHIN(1e-5f, 0.0f, m.delta(25.0f, 35.0f).axis.y);
+    // EMA in a bin
+    FusionVector b3 = {{1.2f, 2.0f, 4.0f}};
+    m.add(36.0f, b3);
+    TEST_ASSERT_EQUAL_INT(2, m.filledBins());
+    // two estimates closer than 0.5 K in adjacent bins give no slope
+    BiasTempModel m2;
+    m2.add(29.9f, b);
+    m2.add(30.1f, b2);
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, m2.delta(20.0f, 40.0f).axis.x);
+    // nonsense temperature is ignored
+    m2.add(NAN, b);
+    TEST_ASSERT_EQUAL_INT(2, m2.filledBins());
+}
+
 int main(int, char **)
 {
     UNITY_BEGIN();
@@ -407,5 +490,7 @@ int main(int, char **)
     RUN_TEST(test_accel_gate_blocks_slow_tilt);
     RUN_TEST(test_begin_and_restart_calibrated);
     RUN_TEST(test_still_calibrator);
+    RUN_TEST(test_temperature_compensation_warmup);
+    RUN_TEST(test_temperature_model);
     return UNITY_END();
 }
