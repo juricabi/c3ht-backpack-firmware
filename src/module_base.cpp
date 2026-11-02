@@ -10,6 +10,7 @@
 #if defined(HAS_HEADTRACKING)
 #include "devHeadTracker.h"
 #include "crsf_protocol.h"
+#include "PtrScale.h"
 #endif
 
 int16_t ptrChannelData[3];
@@ -69,11 +70,11 @@ ModuleBase::Loop(uint32_t now)
         float fyaw, fpitch, froll;
         getEuler(&fyaw, &fpitch, &froll);
 
-        // convert from degrees to servo positions
+        // convert from degrees to servo positions, full scale at HT_MAX_ANGLE_* (default 180 = upstream mapping)
 
-        int pan = map(-fyaw*100, -180*100, 180*100, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000);
-        int tilt = map(fpitch*100, -180*100, 180*100, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000);
-        int roll = map(froll*100, -180*100, 180*100, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000);
+        int pan = ptrAngleToChannel(-fyaw, HT_MAX_ANGLE_PAN, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000);
+        int tilt = ptrAngleToChannel(fpitch, HT_MAX_ANGLE_TILT, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000);
+        int roll = ptrAngleToChannel(froll, HT_MAX_ANGLE_ROLL, CRSF_CHANNEL_VALUE_1000, CRSF_CHANNEL_VALUE_2000);
         mspPacket_t packet;
         packet.reset();
         packet.makeCommand();
