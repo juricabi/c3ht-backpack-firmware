@@ -4,7 +4,7 @@
 
 #define WHO_AM_I 0x75
 #define REVISION_ID 0x01
-#define ACCEL_X1 0x0B
+#define TEMP_DATA1 0x09     // TEMP_DATA1/0, then ACCEL_DATA_X1 at 0x0B
 #define INT_STATUS_DRDY 0x39
 
 #if defined(HT_ICM_FS_1000DPS_4G)
@@ -61,24 +61,28 @@ bool ICMSeries::initialize() {
 }
 
 bool ICMSeries::getDataFromRegisters(FusionVector &accel, FusionVector &gyro) {
-    uint8_t values[12];
+    uint8_t values[14];
 
     // return if NOT ready
     if (!(readRegister(INT_STATUS_DRDY) & 1)) {
         return false;
     }
 
-    // read the accel and gyro data
-    if (readBuffer(ACCEL_X1, values, 12) != 12) {
+    // read the temperature, accel and gyro data in one burst
+    if (readBuffer(TEMP_DATA1, values, 14) != 14) {
         return false;
     }
 
+    // TEMP_DATA in degC = raw / 128 + 25; 0x8000 = no valid data
+    const int16_t rawTemp = (int16_t)((values[0] << 8) | values[1]);
+    temperatureC = rawTemp == INT16_MIN ? NAN : rawTemp / 128.0f + 25.0f;
+
     // map into Gs and dps
-    accel.axis.x =  (int16_t)((values[0] << 8) | values[1]) * ARES;
-    accel.axis.y =  (int16_t)((values[2] << 8) | values[3]) * ARES;
-    accel.axis.z =  (int16_t)((values[4] << 8) | values[5]) * ARES;
-    gyro.axis.x =  (int16_t)((values[6] << 8) | values[7]) * GRES;
-    gyro.axis.y =  (int16_t)((values[8] << 8) | values[9]) * GRES;
-    gyro.axis.z =  (int16_t)((values[10] << 8) | values[11]) * GRES;
+    accel.axis.x =  (int16_t)((values[2] << 8) | values[3]) * ARES;
+    accel.axis.y =  (int16_t)((values[4] << 8) | values[5]) * ARES;
+    accel.axis.z =  (int16_t)((values[6] << 8) | values[7]) * ARES;
+    gyro.axis.x =  (int16_t)((values[8] << 8) | values[9]) * GRES;
+    gyro.axis.y =  (int16_t)((values[10] << 8) | values[11]) * GRES;
+    gyro.axis.z =  (int16_t)((values[12] << 8) | values[13]) * GRES;
     return true;
 }

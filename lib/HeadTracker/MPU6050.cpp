@@ -35,10 +35,12 @@ bool MPU6050::initialize() {
 bool MPU6050::getDataFromRegisters(FusionVector &accel, FusionVector &gyro) {
     uint8_t values[14];
 
-    // Read accel, temp, and gyro data. Temperature is ignored.
+    // Read accel, temp, and gyro data.
     if (readBuffer(ACCEL_X_H, values, 14) != 14) {
         return false;
     }
+    // TEMP_OUT in degC = raw / 340 + 36.53 (MPU-6000/6050 register map 4.18)
+    temperatureC = (int16_t) ((values[6] << 8) | values[7]) / 340.0f + 36.53f;
     accel.axis.x =  (int16_t) ((values[0] << 8) | values[1]) * ARES;
     accel.axis.y =  (int16_t) ((values[2] << 8) | values[3]) * ARES;
     accel.axis.z =  (int16_t) ((values[4] << 8) | values[5]) * ARES;

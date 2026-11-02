@@ -1,6 +1,8 @@
 #ifndef BACKPACK_IMUBASE_H
 #define BACKPACK_IMUBASE_H
 
+#include <math.h>
+#include <stdint.h>
 #include "FusionMath.h"
 
 class IMUBase {
@@ -22,6 +24,8 @@ public:
     float getDeltaTime() const { return deltaTime; }
     // micros() of the data-ready interrupt of the sample last returned by readIMUData()
     uint32_t getSampleTimeUs() const { return sampleTimeUs; }
+    // die temperature (degC) read with the last sample, NAN if the driver has none
+    float getTemperature() const { return temperatureC; }
     float getGyroRange() const { return gyroRange; }
 
 protected:
@@ -30,6 +34,7 @@ protected:
     float gyroRange;
     float gRes = 0;
     uint32_t sampleTimeUs = 0;
+    float temperatureC = NAN;
 
     explicit IMUBase(int _address) : address(_address) {}
 
