@@ -25,6 +25,10 @@
 #include "devLED.h"
 #include "devHeadTracker.h"
 #include "wifiTxPower.h"
+#include "power_logic.h"
+#if defined(C3HT_BOOTCOUNT_POWERON_ONLY)
+  #include <esp_system.h>
+#endif
 #if defined(C3HT_EU_BUILD)
   #include "c3ht_eu.h"
 #endif
@@ -437,6 +441,56 @@ void resetBootCounter()
   config.Commit();
 }
 
+#if defined(C3HT_BOOTCOUNT_POWERON_ONLY)
+// Count only power-on resets, and only after BOOTCOUNT_SETTLE_MS of uptime:
+// brownout, watchdog, panic and software resets (and supply bounces that
+// reset again within 1.5 s) never start binding or WiFi (PREMORTEM D15).
+static bool bootCountPending = false;
+
+void checkIfInBindingMode()
+{
+  esp_reset_reason_t reason = esp_reset_reason();
+  uint8_t stored = config.GetBootCount();
+
+  switch (bootCountOnBoot(reason == ESP_RST_POWERON, stored))
+  {
+  case BOOTCOUNT_TRIGGER:
+    resetBootCounter();
+    if (firmwareOptions.hasUID)
+    {
+      RebootIntoWifi();
+    }
+    else
+    {
+      connectionState = binding;
+      bindingStart = millis();
+    }
+    break;
+  case BOOTCOUNT_COUNT_LATER:
+    bootCountPending = true;
+    break;
+  case BOOTCOUNT_IGNORE:
+    break;
+  }
+
+  DBGLN(""); // blank line to clear below prints from serial boot garbage
+  DBGLN("reset reason = %d, bootCounter = %u%s", (int)reason, stored,
+        bootCountPending ? " (+1 after 1.5 s)" : "");
+  DBG("bindingMode = ");
+  DBGLN("%x", connectionState == binding);
+}
+
+static void updateBootCounter(uint32_t now)
+{
+  if (bootCountDue(bootCountPending, now))
+  {
+    bootCountPending = false;
+    config.SetBootCount(config.GetBootCount() + 1);
+    config.Commit();
+    DBGLN("bootCounter = %u", config.GetBootCount());
+  }
+}
+#else
 void checkIfInBindingMode()
 {
   uint8_t bootCounter = config.GetBootCount();
@@ -468,6 +522,7 @@ void checkIfInBindingMode()
   DBG("bindingMode = ");
   DBGLN("%x", connectionState == binding);
 }
+#endif
 
 bool BindingExpired(uint32_t now)
 {
@@ -598,6 +653,9 @@ void loop()
   }
 
 #if !defined(NO_AUTOBIND)
+  #if defined(C3HT_BOOTCOUNT_POWERON_ONLY)
+    updateBootCounter(now);
+  #endif
   // Power cycle must be done within 30s.  Long timeout to allow goggles to boot and shutdown correctly e.g. Orqa.
   if (now > BINDING_TIMEOUT && config.GetBootCount() > 0)
   {
