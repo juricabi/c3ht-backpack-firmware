@@ -7,8 +7,23 @@
 #define ACCEL_X1 0x0B
 #define INT_STATUS_DRDY 0x39
 
-#define ARES (16.0 / 32768)
-#define GRES (2000.0 / 32768)
+#if defined(HT_ICM_FS_1000DPS_4G)
+// Head-tracking ranges (IMU_SELECTION.md F5): head motion stays well inside
+// +-1000 deg/s and +-4 g, and the finer LSB (0.031 deg/s, 0.12 mg) is below
+// the sensor noise instead of next to it.
+#define ACCEL_CONFIG0_VAL 0x49      // ACCEL_UI_FS_SEL=2 (+-4 g), 100 Hz
+#define GYRO_CONFIG0_VAL 0x29       // GYRO_UI_FS_SEL=1 (+-1000 dps), 100 Hz
+#define ACCEL_RANGE 4.0
+#define GYRO_RANGE 1000.0
+#else
+#define ACCEL_CONFIG0_VAL 9         // 16G, 100Hz
+#define GYRO_CONFIG0_VAL 9          // 2000dps, 100Hz
+#define ACCEL_RANGE 16.0
+#define GYRO_RANGE 2000.0
+#endif
+
+#define ARES (ACCEL_RANGE / 32768)
+#define GRES (GYRO_RANGE / 32768)
 
 bool ICMSeries::initialize() {
     // Make sure it's one of the supported ICM IMUs
@@ -31,15 +46,15 @@ bool ICMSeries::initialize() {
     writeRegister(0x06, 0x03);      // INT_CONFIG, interrupt push-pull, active high
     writeRegister(0x2B, 0x08);      // INT_SOURCE0, drdy
 
-    writeRegister(0x21, 9);         // 16G, 100Hz
-    writeRegister(0x20, 9);         // 2000dps, 100Hz
+    writeRegister(0x21, ACCEL_CONFIG0_VAL);   // ACCEL_CONFIG0, range, 100Hz
+    writeRegister(0x20, GYRO_CONFIG0_VAL);    // GYRO_CONFIG0, range, 100Hz
     writeRegister(0x23, 0x05);      // GYRO_CONFIG1, 34Hz UI LPF
     writeRegister(0x24, 0x45);      // ACCEL_CONFIG1, 34Hz UI LPF
     writeRegister(0x1F, 0x0F);      // Low noise mode for Accel/Gyro
 
     deltaTime = 0.01f;
 
-    gyroRange = 2000.0;
+    gyroRange = GYRO_RANGE;
     gRes = GRES;
 
     return true;
