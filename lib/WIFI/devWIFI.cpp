@@ -641,6 +641,21 @@ static void wifiOff()
   #endif
 }
 
+#if defined(PLATFORM_ESP32)
+// esp_wifi_set_max_tx_power() only works while WiFi is started; called with
+// WiFi off (as startWiFi() used to do) it fails and the radio stays at the
+// PHY default. Apply it after every mode change instead. The driver API is
+// used directly because WiFi.setTxPower() checks the *_STARTED event bits,
+// which are set asynchronously by the Arduino event task.
+static void applyTxPower()
+{
+  if (esp_wifi_set_max_tx_power(WIFI_POWER_19_5dBm) != ESP_OK)
+  {
+    DBGLN("Failed to set WiFi TX power");
+  }
+}
+#endif
+
 static void startWiFi(unsigned long now)
 {
   if (wifiStarted) {
@@ -658,9 +673,9 @@ static void startWiFi(unsigned long now)
   #if defined(PLATFORM_ESP8266)
     WiFi.setOutputPower(20.5);
     WiFi.setPhyMode(WIFI_PHY_MODE_11N);
-  #elif defined(PLATFORM_ESP32)
-    WiFi.setTxPower(WIFI_POWER_19_5dBm);
   #endif
+  // ESP32: the TX power is applied in HandleWebUpdate() once the AP/STA
+  // interface has been started (see applyTxPower()).
   if (firmwareOptions.home_wifi_ssid[0] != 0) {
     strlcpy(station_ssid, firmwareOptions.home_wifi_ssid, sizeof(station_ssid));
     strlcpy(station_password, firmwareOptions.home_wifi_password, sizeof(station_password));
@@ -862,6 +877,9 @@ static void HandleWebUpdate()
         }
 #endif
         WiFi.softAP(wifi_ap_ssid, wifi_ap_password);
+        #if defined(PLATFORM_ESP32)
+        applyTxPower();
+        #endif
         WiFi.scanNetworks(true);
         startServices();
         #if defined(PLATFORM_ESP32)
@@ -873,6 +891,9 @@ static void HandleWebUpdate()
         wifiMode = WIFI_STA;
         WiFi.mode(wifiMode);
         WiFi.setHostname(myHostname); // hostname must be set after the mode is set to STA
+        #if defined(PLATFORM_ESP32)
+        applyTxPower();
+        #endif
         changeTime = now;
         WiFi.begin(station_ssid, station_password);
         startServices();
