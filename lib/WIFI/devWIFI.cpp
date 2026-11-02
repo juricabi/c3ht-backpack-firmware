@@ -278,23 +278,32 @@ static void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, Aw
     // for MSP_ELRS_BACKPACK_SET_HEAD_TRACKING in Vrx_main.cpp): its PTR would
     // be dropped anyway (MSPModuleBase).
   }
-  if (type == WS_EVT_DATA) {
+  if (type == WS_EVT_DATA && len >= 2) {
     if (memcmp(data, "sc", 2) == 0) {
       resetCenter();
     }
 #if defined(HAS_HEADTRACKING)
     if (memcmp(data, "o:", 2) == 0) {
+      // "o:<x>:<y>:<z>"; ignore anything that does not fit or lacks a ':'
       char buf[64];
-      memcpy(buf, data+2, len-2);
-      buf[len-2] = 0;
-      char * colon = strchr(buf, ':');
-      *colon = 0;
-      int x = atoi(buf);
-      char *colon2 = strchr(colon+1, ':');
-      *colon2 = 0;
-      int y = atoi(colon+1);
-      int z = atoi(colon2+1);
-      setBoardOrientation(x, y, z);
+      char *colon = nullptr;
+      char *colon2 = nullptr;
+      if (len - 2 < sizeof(buf)) {
+        memcpy(buf, data+2, len-2);
+        buf[len-2] = 0;
+        colon = strchr(buf, ':');
+      }
+      if (colon != nullptr) {
+        *colon = 0;
+        colon2 = strchr(colon+1, ':');
+      }
+      if (colon2 != nullptr) {
+        *colon2 = 0;
+        int x = atoi(buf);
+        int y = atoi(colon+1);
+        int z = atoi(colon2+1);
+        setBoardOrientation(x, y, z);
+      }
     } else if (memcmp(data, "ci", 2) == 0) {
       startIMUCalibration();
     } else if (memcmp(data, "ro", 2) == 0) {
