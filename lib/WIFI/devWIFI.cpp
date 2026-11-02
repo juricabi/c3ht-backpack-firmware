@@ -36,6 +36,7 @@
 
 #include "config.h"
 #include "wifiTxPower.h"
+#include "power_logic.h"
 
 #if defined(MAVLINK_ENABLED)
 #include <MAVLink.h>
@@ -113,6 +114,16 @@ static bool force_update = false;
 static bool do_flash = false;
 static uint32_t totalSize;
 static UpdateWrapper updater = UpdateWrapper();
+
+#if defined(C3HT_WIFI_IDLE_TIMEOUT_S)
+// C3HT: leave WiFi update mode (reboot to normal) after C3HT_WIFI_IDLE_TIMEOUT_S
+// without a client: no station on the AP, no WebSocket, no HTTP request and no
+// upload running (PREMORTEM D15). Upstream WiFi mode has no timeout.
+static volatile uint32_t lastClientActivity = 0;
+static inline void noteClientActivity() { lastClientActivity = millis(); }
+#else
+static inline void noteClientActivity() {}
+#endif
 
 #if defined(MAVLINK_ENABLED)
 WiFiUDP mavlinkUDP;
@@ -233,6 +244,7 @@ static struct {
 #if defined(HAS_HEADTRACKING) || defined(SUPPORT_HEADTRACKING)
 static void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len)
 {
+  noteClientActivity();
   if (type == WS_EVT_CONNECT) {
     static const char IMU_JSON[] PROGMEM = R"=====({"orientation":true,"heading":%f,"pitch":%f,"roll":%f,"hasIMU":%s})=====";
     // Send JSON over websocket
@@ -293,6 +305,7 @@ static void WebUpdateSendContent(AsyncWebServerRequest *request)
 
 static void WebUpdateHandleRoot(AsyncWebServerRequest *request)
 {
+  noteClientActivity();
   if (captivePortal(request))
   { // If captive portal redirect instead of displaying the page.
     return;
@@ -308,6 +321,7 @@ static void WebUpdateHandleRoot(AsyncWebServerRequest *request)
 
 static void GetConfiguration(AsyncWebServerRequest *request)
 {
+  noteClientActivity();
   JsonDocument json;
   json["config"]["ssid"] = station_ssid;
   json["config"]["mode"] = wifiMode == WIFI_STA ? "STA" : "AP";
@@ -483,6 +497,7 @@ static void WebUploadResponseHandler(AsyncWebServerRequest *request) {
 }
 
 static void WebUploadDataHandler(AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
+  noteClientActivity();
   if (index == 0) {
     DBGLN("Update: %s, %s", filename.c_str(), request->arg("type").c_str());
     target_seen = false;
@@ -700,7 +715,31 @@ static void startWiFi(unsigned long now)
   }
   laststatus = WL_NO_SHIELD;
   wifiStarted = true;
+  noteClientActivity(); // the idle timeout starts when WiFi mode starts
 }
+
+#if defined(C3HT_WIFI_IDLE_TIMEOUT_S)
+static void checkIdleTimeout(unsigned long now)
+{
+  // Only for user-requested WiFi update mode (not failure states), once.
+  if (connectionState != wifiUpdate || rebootTime != 0)
+    return;
+  bool active = updater.isRunning();
+  if ((wifiMode == WIFI_AP) && WiFi.softAPgetStationNum() > 0)
+    active = true;
+#if defined(HAS_HEADTRACKING) || defined(SUPPORT_HEADTRACKING)
+  if (ws.count() > 0)
+    active = true;
+#endif
+  if (active)
+    lastClientActivity = now;
+  if (wifiIdleExpired(lastClientActivity, now, (uint32_t)(C3HT_WIFI_IDLE_TIMEOUT_S) * 1000U))
+  {
+    DBGLN("WiFi idle for %u s without a client, rebooting to normal mode", (unsigned)(C3HT_WIFI_IDLE_TIMEOUT_S));
+    rebootTime = now + 200;
+  }
+}
+#endif
 
 static void startMDNS()
 {
@@ -831,6 +870,9 @@ static void startServices()
 static void HandleWebUpdate()
 {
   unsigned long now = millis();
+#if defined(C3HT_WIFI_IDLE_TIMEOUT_S)
+  checkIdleTimeout(now);
+#endif
   wl_status_t status = WiFi.status();
   if (status != laststatus && wifiMode == WIFI_STA) {
     DBGLN("WiFi status %d", status);

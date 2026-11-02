@@ -36,3 +36,16 @@ constexpr bool bootCountDue(bool pending, uint32_t nowMs)
 {
     return pending && nowMs >= BOOTCOUNT_SETTLE_MS;
 }
+
+/////////// WiFi update mode idle timeout ///////////
+// C3HT_WIFI_IDLE_TIMEOUT_S: reboot to normal mode after this long without a
+// client. millis() wrap-safe (unsigned difference). lastActivityMs is written
+// by the web server task and may be a little newer than nowMs: a "negative"
+// age (bit 31 set) means "just active", never "expired".
+
+constexpr bool wifiIdleExpired(uint32_t lastActivityMs, uint32_t nowMs, uint32_t timeoutMs)
+{
+    return timeoutMs != 0
+        && (uint32_t)(nowMs - lastActivityMs) >= timeoutMs
+        && (uint32_t)(nowMs - lastActivityMs) < 0x80000000u;
+}

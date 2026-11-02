@@ -21,4 +21,13 @@ static_assert(!bootCountDue(true, BOOTCOUNT_SETTLE_MS - 1), "not counted before 
 static_assert(bootCountDue(true, BOOTCOUNT_SETTLE_MS), "counted at 1.5 s");
 static_assert(!bootCountDue(false, 60000), "nothing pending, nothing counted");
 
+// --- WiFi idle timeout (5 min) ---
+static_assert(!wifiIdleExpired(0, 0, 300000), "not expired at start");
+static_assert(!wifiIdleExpired(1000, 300999, 300000), "1 ms before 5 min");
+static_assert(wifiIdleExpired(1000, 301000, 300000), "expired at 5 min");
+static_assert(!wifiIdleExpired(0xFFFFF000u, 0x00001000u, 300000), "millis() wrap: 8 s idle");
+static_assert(wifiIdleExpired(0xFFFFF000u, 300000u, 300000), "millis() wrap: > 5 min idle");
+static_assert(!wifiIdleExpired(0, 0xFFFFFFFFu, 0), "timeout 0 disables");
+static_assert(!wifiIdleExpired(5001, 5000, 300000), "activity newer than now (other task) is not idle");
+
 #endif
