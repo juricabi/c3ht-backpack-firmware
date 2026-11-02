@@ -49,3 +49,31 @@ constexpr bool wifiIdleExpired(uint32_t lastActivityMs, uint32_t nowMs, uint32_t
         && (uint32_t)(nowMs - lastActivityMs) >= timeoutMs
         && (uint32_t)(nowMs - lastActivityMs) < 0x80000000u;
 }
+
+/////////// Brownout reset counter (RTC memory) ///////////
+// C3HT_BROWNOUT_STATS: brownout resets since the last power-on, kept in
+// RTC_NOINIT memory. That survives brownout, watchdog, panic and software
+// resets but not a power loss. The record is {magic, count, ~count}; anything
+// else (power-on garbage, a supply drop deep enough to lose RTC RAM) is
+// invalid and restarts the count.
+
+#define RESETSTATS_MAGIC 0xC3B0B0C3u
+
+constexpr bool resetStatsValid(uint32_t magic, uint16_t count, uint16_t countInv)
+{
+    return magic == RESETSTATS_MAGIC && (uint16_t)~count == countInv;
+}
+
+// Brownout count after this boot. A power-on reset (or an invalid record)
+// starts again from 0; a brownout reset adds one, saturating at 0xFFFF.
+constexpr uint16_t brownoutBase(bool recordValid, bool powerOnReset, uint16_t stored)
+{
+    return (powerOnReset || !recordValid) ? 0 : stored;
+}
+
+constexpr uint16_t brownoutCountOnBoot(bool recordValid, bool powerOnReset, bool brownoutReset, uint16_t stored)
+{
+    return (brownoutReset && brownoutBase(recordValid, powerOnReset, stored) != 0xFFFF)
+         ? (uint16_t)(brownoutBase(recordValid, powerOnReset, stored) + 1)
+         : brownoutBase(recordValid, powerOnReset, stored);
+}

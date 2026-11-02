@@ -141,6 +141,16 @@ function updateConfig(data) {
         _('tx_tab').style.display = 'none';
     }
     if(config['product_name'] && _('product_name')) _('product_name').textContent = config['product_name'];
+    if (config.reset && _('product_name')) {
+        let r = _('resetinfo');
+        if (!r) {
+            r = document.createElement('p');
+            r.id = 'resetinfo';
+            _('product_name').parentNode.appendChild(r);
+        }
+        r.textContent = 'Last reset: ' + config.reset.reason + ', brownouts since power-on: ' + config.reset.brownouts +
+            (config.reset.bod_armed ? '' : ' (brownout detector OFF)');
+    }
 
     updateAatConfig(config);
 }

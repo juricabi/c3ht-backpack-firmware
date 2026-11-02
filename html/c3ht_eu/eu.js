@@ -73,6 +73,7 @@ async function refreshInfo() {
   row(t, 'IMU', j.imu ? 'detected' : 'not detected');
   row(t, 'Radio power setting', j.tx_power_qdbm >= 0 ? (j.tx_power_qdbm / 4) + ' dBm' : '-');
   row(t, 'Uptime', j.uptime_s + ' s (boot #' + j.boot + ')');
+  if (j.brownouts !== undefined) row(t, 'Last reset', j.reset_reason + ', ' + j.brownouts + ' brownout(s) since power-on' + (j.bod_armed ? '' : ' (brownout detector OFF)'));
   $('ap-left').textContent = j.ap_remaining_s;
   $('upd-target').textContent = j.target;
   $('banner-default').classList.toggle('hidden', !j.default_pw);

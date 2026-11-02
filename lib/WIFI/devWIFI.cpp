@@ -37,6 +37,7 @@
 #include "config.h"
 #include "wifiTxPower.h"
 #include "power_logic.h"
+#include "reset_stats.h"
 
 #if defined(MAVLINK_ENABLED)
 #include <MAVLink.h>
@@ -329,6 +330,11 @@ static void GetConfiguration(AsyncWebServerRequest *request)
 
 #if defined(HAS_HEADTRACKING) || defined(SUPPORT_HEADTRACKING)
   json["config"]["head-tracking"] = true;
+#endif
+#if defined(C3HT_BROWNOUT_STATS) && defined(PLATFORM_ESP32)
+  json["config"]["reset"]["reason"] = resetStatsReasonName();
+  json["config"]["reset"]["brownouts"] = resetStatsBrownouts();
+  json["config"]["reset"]["bod_armed"] = resetStatsBrownoutArmed();
 #endif
 #if defined(AAT_BACKPACK)
   WebAatAppendConfig(json);

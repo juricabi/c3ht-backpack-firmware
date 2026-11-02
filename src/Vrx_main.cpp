@@ -26,6 +26,7 @@
 #include "devHeadTracker.h"
 #include "wifiTxPower.h"
 #include "power_logic.h"
+#include "reset_stats.h"
 #if defined(C3HT_BOOTCOUNT_POWERON_ONLY)
   #include <esp_system.h>
 #endif
@@ -557,6 +558,9 @@ void setup()
     // Otherwise, delay it till the end of setup
     Serial.begin(VRX_UART_BAUD);
   #endif
+#if defined(C3HT_BROWNOUT_STATS) && defined(PLATFORM_ESP32)
+  resetStatsInit();
+#endif
 
   options_init();
 

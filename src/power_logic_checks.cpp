@@ -30,4 +30,21 @@ static_assert(wifiIdleExpired(0xFFFFF000u, 300000u, 300000), "millis() wrap: > 5
 static_assert(!wifiIdleExpired(0, 0xFFFFFFFFu, 0), "timeout 0 disables");
 static_assert(!wifiIdleExpired(5001, 5000, 300000), "activity newer than now (other task) is not idle");
 
+// --- brownout counter (RTC memory) ---
+static_assert(resetStatsValid(RESETSTATS_MAGIC, 3, (uint16_t)~3), "valid record");
+static_assert(!resetStatsValid(RESETSTATS_MAGIC, 3, 3), "count/check mismatch is invalid");
+static_assert(!resetStatsValid(0, 0, 0xFFFF), "wrong magic is invalid");
+static_assert(!resetStatsValid(0, 0, 0), "zeroed RAM is invalid");
+// Power-on starts from 0 whatever RTC RAM holds.
+static_assert(brownoutCountOnBoot(true, true, false, 7) == 0, "power-on clears");
+static_assert(brownoutCountOnBoot(false, true, false, 7) == 0, "power-on clears (garbage)");
+// Brownout resets count up from a valid record, or restart at 1.
+static_assert(brownoutCountOnBoot(true, false, true, 0) == 1, "1st brownout");
+static_assert(brownoutCountOnBoot(true, false, true, 4) == 5, "next brownout");
+static_assert(brownoutCountOnBoot(false, false, true, 4) == 1, "brownout, record lost");
+static_assert(brownoutCountOnBoot(true, false, true, 0xFFFF) == 0xFFFF, "saturates");
+// Other resets (watchdog, panic, software) keep the count.
+static_assert(brownoutCountOnBoot(true, false, false, 4) == 4, "WDT/SW reset keeps count");
+static_assert(brownoutCountOnBoot(false, false, false, 4) == 0, "WDT/SW reset, record lost");
+
 #endif
