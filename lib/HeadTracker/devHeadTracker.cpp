@@ -52,6 +52,7 @@ static void initialize()
             }
             else {
                 delete imu;
+                imu = nullptr;
                 ht_state = STATE_ERROR;
                 return;
             }
@@ -83,7 +84,7 @@ static void initialize()
 
 static int start()
 {
-    if (ht_state == STATE_ERROR)
+    if (ht_state == STATE_ERROR || imu == nullptr)
     {
         return DURATION_NEVER;
     }
@@ -180,6 +181,10 @@ static int timeout()
 
 void startIMUCalibration()
 {
+    if (imu == nullptr || ht_state == STATE_ERROR)
+    {
+        return;
+    }
     imu->beginCalibration();
     cal_started = millis();
     ht_state = STATE_IMU_CALIBRATING;

@@ -36,7 +36,9 @@ bool MPU6050::getDataFromRegisters(FusionVector &accel, FusionVector &gyro) {
     uint8_t values[14];
 
     // Read accel, temp, and gyro data. Temperature is ignored.
-    readBuffer(ACCEL_X_H, values, 14);
+    if (readBuffer(ACCEL_X_H, values, 14) != 14) {
+        return false;
+    }
     accel.axis.x =  (int16_t) ((values[0] << 8) | values[1]) * ARES;
     accel.axis.y =  (int16_t) ((values[2] << 8) | values[3]) * ARES;
     accel.axis.z =  (int16_t) ((values[4] << 8) | values[5]) * ARES;

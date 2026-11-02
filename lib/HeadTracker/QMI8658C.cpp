@@ -88,14 +88,18 @@ bool QMI8658C::getDataFromRegisters(FusionVector &accel, FusionVector &gyro) {
     // Wait for data ready
     uint32_t t1 = millis();
     do {
-        readBuffer(0x2D, values, 3);
+        if (readBuffer(0x2D, values, 3) != 3) {
+            return false;
+        }
     } while ((values[0] & 3) != 3 && (millis() - t1 < 1000));
     if ((values[0] & 3) != 3) {
         return false;
     }
 
     // read teh accel and gyro data
-    readBuffer(ACCEL_X_L, values, 12);
+    if (readBuffer(ACCEL_X_L, values, 12) != 12) {
+        return false;
+    }
 
     // map into Gs and dps
     accel.axis.x =  (int16_t)((values[1] << 8) | values[0]) * ARES;

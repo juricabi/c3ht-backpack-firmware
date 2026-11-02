@@ -54,7 +54,9 @@ bool ICMSeries::getDataFromRegisters(FusionVector &accel, FusionVector &gyro) {
     }
 
     // read the accel and gyro data
-    readBuffer(ACCEL_X1, values, 12);
+    if (readBuffer(ACCEL_X1, values, 12) != 12) {
+        return false;
+    }
 
     // map into Gs and dps
     accel.axis.x =  (int16_t)((values[0] << 8) | values[1]) * ARES;
