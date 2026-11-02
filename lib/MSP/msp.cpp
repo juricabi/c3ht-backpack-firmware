@@ -90,6 +90,14 @@ MSP::processReceivedByte(uint8_t c)
                 m_packet.flags = header->flags;
                 // reset the offset iterator for re-use in payload below
                 m_offset = 0;
+#if defined(MSP_BOUNDS_CHECK)
+                if (m_packet.payloadSize > MSP_PORT_INBUF_SIZE) {
+                    // drop the packet and resynchronise on the next '$'
+                    m_packet.reset();
+                    m_inputState = MSP_IDLE;
+                    break;
+                }
+#endif
                 if (m_packet.payloadSize == 0)
                     m_inputState = MSP_CHECKSUM_V2_NATIVE;
                 else
@@ -98,6 +106,12 @@ MSP::processReceivedByte(uint8_t c)
             break;
 
         case MSP_PAYLOAD_V2_NATIVE:
+#if defined(MSP_BOUNDS_CHECK)
+            if (m_offset >= MSP_PORT_INBUF_SIZE) {
+                m_inputState = MSP_IDLE;
+                break;
+            }
+#endif
             // Read bytes until we reach payloadSize
             m_packet.payload[m_offset++] = c;
             m_crc = crc8_dvb_s2(m_crc, c);
@@ -161,6 +175,11 @@ MSP::sendPacket(mspPacket_t* packet, Stream* port)
         // Response packet with no payload
         return false;
     }
+#if defined(MSP_BOUNDS_CHECK)
+    if (packet->payloadSize > MSP_PORT_INBUF_SIZE) {
+        return false;
+    }
+#endif
     
     // Write out the framing chars
     port->write('$');
@@ -215,6 +234,11 @@ MSP::convertToByteArray(mspPacket_t* packet, uint8_t* byteArray)
         // Response packet with no payload
         return 0;
     }
+#if defined(MSP_BOUNDS_CHECK)
+    if (packet->payloadSize > MSP_PORT_INBUF_SIZE) {
+        return 0;
+    }
+#endif
     
     // Write out the framing chars
     byteArray[bufferPos++] = '$';
@@ -260,6 +284,11 @@ uint8_t
 MSP::getTotalPacketSize(mspPacket_t* packet)
 {
     uint8_t totalSize = 0;
+#if defined(MSP_BOUNDS_CHECK)
+    if (packet->payloadSize > MSP_PORT_INBUF_SIZE) {
+        return 0; // callers must treat 0 as "do not send"
+    }
+#endif
     
     // framing chars
     totalSize += sizeof('$');

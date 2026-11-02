@@ -8,6 +8,14 @@
 // for custom OSD text.
 #define MSP_PORT_INBUF_SIZE 64
 
+// Bounds checking for MSP payloads (remote stack overflow via ESP-NOW/UART when
+// the MSPv2 header announces payloadSize > MSP_PORT_INBUF_SIZE). Enabled for
+// the C3HT EU build; other builds can opt in with -D C3HT_FIX_MSP_BOUNDS.
+// Oversized packets are dropped, never truncated.
+#if defined(C3HT_EU_BUILD) || defined(C3HT_FIX_MSP_BOUNDS)
+#define MSP_BOUNDS_CHECK 1
+#endif
+
 #define CHECK_PACKET_PARSING() \
   if (packet->readError) {\
     return;\
@@ -58,6 +66,12 @@ typedef struct {
 
     void addByte(uint8_t b)
     {
+#if defined(MSP_BOUNDS_CHECK)
+        if (payloadSize >= MSP_PORT_INBUF_SIZE) {
+            readError = true;
+            return;
+        }
+#endif
         payload[payloadSize++] = b;
     }
 
