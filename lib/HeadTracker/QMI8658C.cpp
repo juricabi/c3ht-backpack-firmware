@@ -43,7 +43,15 @@ int QMI8658C::writeCommand(uint8_t cmd)
 
 bool QMI8658C::initialize() {
     writeRegister(0x60, 0xB0);          // Reset
-    while(!(readRegister(0x4D) & 0x80));
+    // wait for the reset-done flag, bounded: a device that never sets it
+    // (or a stuck bus) must not hang the boot
+    const uint32_t resetStart = millis();
+    while (!(readRegister(0x4D) & 0x80)) {
+        if (millis() - resetStart > 50) {
+            DBGLN("QMI8658C reset timeout");
+            return false;
+        }
+    }
 
     writeRegister(0x02, 0b01100000);    // enable auto-increment, BIG endian
 

@@ -49,21 +49,23 @@ static void initialize()
     Wire.setTimeout(1000);
 
     // Initializing the IMU
-    imu = new MPU6050();
+    // ICMSeries first: it matches an exact WHO_AM_I list, while the MPU6050
+    // check masks bit 0 and would also take an ICM-42670-S (0x69) for an MPU6050.
+    imu = new ICMSeries();
     if (imu->initialize()) {
-        DBGLN("Found MPU6050 IMU")
+        DBGLN("Found ICM Series IMU")
     }
     else {
         delete imu;
-        imu = new QMI8658C();
+        imu = new MPU6050();
         if (imu->initialize()) {
-            DBGLN("Found QMI8658C IMU")
+            DBGLN("Found MPU6050 IMU")
         }
         else {
             delete imu;
-            imu = new ICMSeries();
+            imu = new QMI8658C();
             if (imu->initialize()) {
-                DBGLN("Found ICM Series IMU")
+                DBGLN("Found QMI8658C IMU")
             }
             else {
                 delete imu;
