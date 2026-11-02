@@ -93,7 +93,7 @@ static int start()
 #ifdef DEBUG_LOG
     Serial.printf("Load %7.2f %7.2f %7.2f\r\n", orientation[0], orientation[1], orientation[2]);
 #endif
-    if (isnan(orientation[0]) || isnan(orientation[2]) || isnan(orientation[2])) {
+    if (isnan(orientation[0]) || isnan(orientation[1]) || isnan(orientation[2])) {
         orientation[0] = 0;
         orientation[1] = 0;
         orientation[2] = 0;
