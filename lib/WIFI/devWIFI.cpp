@@ -122,6 +122,12 @@ static UpdateWrapper updater = UpdateWrapper();
 // upload running (PREMORTEM D15). Upstream WiFi mode has no timeout.
 static volatile uint32_t lastClientActivity = 0;
 static inline void noteClientActivity() { lastClientActivity = millis(); }
+// WebSocket clients, counted in onWsEvent (web server task). The loop task
+// must not call ws.count(): it walks the client list without a lock while
+// the web server task removes and deletes clients from it. Every client
+// gets one WS_EVT_CONNECT (constructor) and one WS_EVT_DISCONNECT
+// (destructor).
+static volatile int wsClients = 0;
 #else
 static inline void noteClientActivity() {}
 #endif
@@ -246,6 +252,13 @@ static struct {
 static void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len)
 {
   noteClientActivity();
+#if defined(C3HT_WIFI_IDLE_TIMEOUT_S)
+  if (type == WS_EVT_CONNECT) {
+    wsClients = wsClients + 1;
+  } else if (type == WS_EVT_DISCONNECT && wsClients > 0) {
+    wsClients = wsClients - 1;
+  }
+#endif
   if (type == WS_EVT_CONNECT) {
     static const char IMU_JSON[] PROGMEM = R"=====({"orientation":true,"heading":%f,"pitch":%f,"roll":%f,"hasIMU":%s})=====";
     // Send JSON over websocket
@@ -734,7 +747,7 @@ static void checkIdleTimeout(unsigned long now)
   if ((wifiMode == WIFI_AP) && WiFi.softAPgetStationNum() > 0)
     active = true;
 #if defined(HAS_HEADTRACKING) || defined(SUPPORT_HEADTRACKING)
-  if (ws.count() > 0)
+  if (wsClients > 0)
     active = true;
 #endif
   if (active)
