@@ -40,6 +40,7 @@ static uint32_t cal_started;
 // adapts.
 static GyroBiasEstimator gyroBias;
 static unsigned int gyroBiasRate = 0;
+static StillCalibrator webCalibration;     // web-UI "ci"
 
 static unsigned int imuRateHz()
 {
@@ -347,14 +348,30 @@ static int timeout()
         }
 
         case STATE_IMU_CALIBRATING: {
+#if defined(HT_GYRO_BIAS_TRACKING)
+            // mean of a still window (F1), saved only if the stillness tests pass
+            const StillCalibrator::Result r = webCalibration.update(g, a);
+            if (r == StillCalibrator::ACCEPTED) {
+                const float *cal = imu->getCalibration();
+                const FusionVector m = webCalibration.mean();
+                float newCal[3] = {cal[0] - m.axis.x, cal[1] - m.axis.y, cal[2] - m.axis.z};
+                imu->setCalibration(&newCal);
+                config.SetIMUCalibration(imu->getCalibration());
+                config.Commit();
+                gyroBias.restartCalibrated(imu->getTemperature());
+                DBGLN("IMU calibration saved");
+                ht_state = STATE_RUNNING;
+            } else if (r != StillCalibrator::RUNNING) {
+                DBGLN("IMU calibration failed (not still), stored calibration kept");
+                ht_state = STATE_RUNNING;
+            }
+#else
             if (imu->updateCalibration(g)) {
                 config.SetIMUCalibration(imu->getCalibration());
                 config.Commit();
-#if defined(HT_GYRO_BIAS_TRACKING)
-                gyroBiasBegin();    // the stored calibration changed: re-estimate from scratch
-#endif
                 ht_state = STATE_RUNNING;
             }
+#endif
             break;
         }
 
@@ -371,7 +388,15 @@ void startIMUCalibration()
     {
         return;
     }
+#if defined(HT_GYRO_BIAS_TRACKING)
+    GyroBiasSettings s = GyroBiasDefaultSettings(imuRateHz());
+    // this sets the stored calibration itself, so allow any plausible raw
+    // MEMS offset instead of the 3 deg/s limit for the residual at boot
+    s.maxBootBiasDps = 30.0f;
+    webCalibration.begin(s);
+#else
     imu->beginCalibration();
+#endif
     cal_started = millis();
     ht_state = STATE_IMU_CALIBRATING;
 }
