@@ -381,9 +381,18 @@ static void WebUpdateSetHome(AsyncWebServerRequest *request)
   String ssid = request->arg("network");
   String password = request->arg("password");
 
+  // Reject what does not fit rather than overflow station_ssid/station_password and the
+  // config copies of the same size: an 802.11 SSID is at most 32 bytes, a WPA passphrase
+  // at most 63 characters (64 for a hex PSK).
+  if (ssid.length() >= sizeof(station_ssid) || password.length() >= sizeof(station_password)) {
+    DBGLN("Home network rejected: SSID or password too long");
+    request->send(400, "text/plain", "Network name (max 32) or password (max 64) too long");
+    return;
+  }
+
   DBGLN("Setting home network %s", ssid.c_str());
-  strcpy(station_ssid, ssid.c_str());
-  strcpy(station_password, password.c_str());
+  strlcpy(station_ssid, ssid.c_str(), sizeof(station_ssid));
+  strlcpy(station_password, password.c_str(), sizeof(station_password));
   // Only save to config if we don't have a flashed wifi network
   if (firmwareOptions.home_wifi_ssid[0] == 0) {
     config.SetSSID(ssid.c_str());
@@ -401,8 +410,8 @@ static void WebUpdateForget(AsyncWebServerRequest *request)
   config.Commit();
   // If we have a flashed wifi network then let's try reconnecting to that otherwise start an access point
   if (firmwareOptions.home_wifi_ssid[0] != 0) {
-    strcpy(station_ssid, firmwareOptions.home_wifi_ssid);
-    strcpy(station_password, firmwareOptions.home_wifi_password);
+    strlcpy(station_ssid, firmwareOptions.home_wifi_ssid, sizeof(station_ssid));
+    strlcpy(station_password, firmwareOptions.home_wifi_password, sizeof(station_password));
     String msg = String("Temporary network forgotten, attempting to connect to network '") + station_ssid + "'";
     sendResponse(request, msg);
     changeWifiMode(WIFI_STA);
@@ -653,12 +662,12 @@ static void startWiFi(unsigned long now)
     WiFi.setTxPower(WIFI_POWER_19_5dBm);
   #endif
   if (firmwareOptions.home_wifi_ssid[0] != 0) {
-    strcpy(station_ssid, firmwareOptions.home_wifi_ssid);
-    strcpy(station_password, firmwareOptions.home_wifi_password);
+    strlcpy(station_ssid, firmwareOptions.home_wifi_ssid, sizeof(station_ssid));
+    strlcpy(station_password, firmwareOptions.home_wifi_password, sizeof(station_password));
   }
   else {
-    strcpy(station_ssid, config.GetSSID());
-    strcpy(station_password, config.GetPassword());
+    strlcpy(station_ssid, config.GetSSID(), sizeof(station_ssid));
+    strlcpy(station_password, config.GetPassword(), sizeof(station_password));
   }
   if (station_ssid[0] == 0) {
     changeTime = now;

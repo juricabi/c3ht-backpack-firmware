@@ -68,14 +68,14 @@ TxBackpackConfig::SetStartWiFiOnBoot(bool startWifi)
 void
 TxBackpackConfig::SetSSID(const char *ssid)
 {
-    strcpy(m_config.ssid, ssid);
+    strlcpy(m_config.ssid, ssid, sizeof(m_config.ssid));
     m_modified = true;
 }
 
 void
 TxBackpackConfig::SetPassword(const char *password)
 {
-    strcpy(m_config.password, password);
+    strlcpy(m_config.password, password, sizeof(m_config.password));
     m_modified = true;
 }
 
@@ -196,14 +196,14 @@ VrxBackpackConfig::SetDefaults()
 void
 VrxBackpackConfig::SetSSID(const char *ssid)
 {
-    strcpy(m_config.ssid, ssid);
+    strlcpy(m_config.ssid, ssid, sizeof(m_config.ssid));
     m_modified = true;
 }
 
 void
 VrxBackpackConfig::SetPassword(const char *password)
 {
-    strcpy(m_config.password, password);
+    strlcpy(m_config.password, password, sizeof(m_config.password));
     m_modified = true;
 }
 
@@ -391,14 +391,14 @@ TimerBackpackConfig::SetStartWiFiOnBoot(bool startWifi)
 void
 TimerBackpackConfig::SetSSID(const char *ssid)
 {
-    strcpy(m_config.ssid, ssid);
+    strlcpy(m_config.ssid, ssid, sizeof(m_config.ssid));
     m_modified = true;
 }
 
 void
 TimerBackpackConfig::SetPassword(const char *password)
 {
-    strcpy(m_config.password, password);
+    strlcpy(m_config.password, password, sizeof(m_config.password));
     m_modified = true;
 }
 
