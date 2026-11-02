@@ -271,7 +271,12 @@ static void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, Aw
 #endif
     ws.text(client->id(), payload, strlen(payload));
     headTrackingEnabled = true;
+#if !defined(HAS_HEADTRACKING)
     sendHeadTrackingChangesToVrx = true;
+#endif
+    // With an on-board IMU the goggle's own tracker is not switched on (as
+    // for MSP_ELRS_BACKPACK_SET_HEAD_TRACKING in Vrx_main.cpp): its PTR would
+    // be dropped anyway (MSPModuleBase).
   }
   if (type == WS_EVT_DATA) {
     if (memcmp(data, "sc", 2) == 0) {

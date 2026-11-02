@@ -167,7 +167,8 @@ MSPModuleBase::Loop(uint32_t now)
                 // would receive two interleaved PTR streams and jitter between them. The
                 // goggle's own tracker is not enabled by this backpack either: with
                 // HAS_HEADTRACKING, MSP_ELRS_BACKPACK_SET_HEAD_TRACKING re-centres the
-                // on-board IMU instead of being forwarded to the goggle.
+                // on-board IMU instead of being forwarded to the goggle, and opening the
+                // web head-tracking page does not send the enable command (devWIFI.cpp).
 #else
                 ptrChannelData[0] = packet->payload[0] + (packet->payload[1] << 8);
                 ptrChannelData[1] = packet->payload[2] + (packet->payload[3] << 8);
