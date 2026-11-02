@@ -35,6 +35,7 @@
 #include "WebContent.h"
 
 #include "config.h"
+#include "wifiTxPower.h"
 
 #if defined(MAVLINK_ENABLED)
 #include <MAVLink.h>
@@ -649,9 +650,14 @@ static void wifiOff()
 // which are set asynchronously by the Arduino event task.
 static void applyTxPower()
 {
-  if (esp_wifi_set_max_tx_power(WIFI_POWER_19_5dBm) != ESP_OK)
+  int8_t p = wifiApplyTxPower(); // 19.5 dBm, or C3HT_ESPNOW_TX_DBM
+  if (p < 0)
   {
     DBGLN("Failed to set WiFi TX power");
+  }
+  else
+  {
+    DBGLN("WiFi TX power %d (0.25 dBm units)", p);
   }
 }
 #endif

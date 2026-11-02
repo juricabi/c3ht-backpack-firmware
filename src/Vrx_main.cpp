@@ -24,6 +24,7 @@
 #include "devButton.h"
 #include "devLED.h"
 #include "devHeadTracker.h"
+#include "wifiTxPower.h"
 #if defined(C3HT_EU_BUILD)
   #include "c3ht_eu.h"
 #endif
@@ -363,11 +364,25 @@ void SetSoftMACAddress()
   #if defined(PLATFORM_ESP8266)
     WiFi.setOutputPower(20.5);
   #elif defined(PLATFORM_ESP32)
-    WiFi.setTxPower(WIFI_POWER_19_5dBm);
+    #if defined(C3HT_ESPNOW_TX_DBM)
+      // STA was started by WiFi.mode(): apply the cap before the first frame
+      // (the fake WiFi.begin() below sends probe requests).
+      wifiApplyTxPower();
+    #else
+      WiFi.setTxPower(WIFI_POWER_19_5dBm);
+    #endif
     esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_LR);
   #endif
   WiFi.begin("network-name", "pass-to-network", 1);
   WiFi.disconnect();
+  #if defined(PLATFORM_ESP32) && defined(C3HT_ESPNOW_TX_DBM)
+    {
+      // Re-apply after the protocol/connect calls and log the read-back.
+      int8_t txPower = wifiApplyTxPower();
+      DBGLN("ESP-NOW TX power %d (0.25 dBm units)", txPower);
+      (void)txPower;
+    }
+  #endif
 #endif
 
   // Soft-set the MAC address to the passphrase UID for binding
