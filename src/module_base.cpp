@@ -160,10 +160,19 @@ MSPModuleBase::Loop(uint32_t now)
             }
             else if (packet->function == MSP_ELRS_BACKPACK_SET_PTR && headTrackingEnabled)
             {
+#if defined(HAS_HEADTRACKING)
+                // PTR source precedence: with an on-board IMU, ModuleBase::Loop() is the only
+                // PTR source. PTR forwarded by the goggle is dropped here, otherwise the TX
+                // would receive two interleaved PTR streams and jitter between them. The
+                // goggle's own tracker is not enabled by this backpack either: with
+                // HAS_HEADTRACKING, MSP_ELRS_BACKPACK_SET_HEAD_TRACKING re-centres the
+                // on-board IMU instead of being forwarded to the goggle.
+#else
                 ptrChannelData[0] = packet->payload[0] + (packet->payload[1] << 8);
                 ptrChannelData[1] = packet->payload[2] + (packet->payload[3] << 8);
                 ptrChannelData[2] = packet->payload[4] + (packet->payload[5] << 8);
                 sendMSPViaEspnow(packet);
+#endif
             }
             msp.markPacketReceived();
         }
