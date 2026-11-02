@@ -27,6 +27,9 @@
 #include "wifiTxPower.h"
 #include "power_logic.h"
 #include "reset_stats.h"
+#if defined(C3HT_SPI_LOW_DRIVE) && defined(PLATFORM_ESP32)
+  #include <driver/gpio.h>
+#endif
 #if defined(C3HT_BOOTCOUNT_POWERON_ONLY)
   #include <esp_system.h>
 #endif
@@ -525,6 +528,40 @@ void checkIfInBindingMode()
 }
 #endif
 
+#if defined(C3HT_SPI_LOW_DRIVE) && defined(PLATFORM_ESP32) && defined(PIN_MOSI)
+// C3HT: the SPI bit-bang lines (Rapidfire / SteadyView / RX5808) go straight
+// to the goggle module with no series resistors on the small board, and some
+// goggles drive the same lines (DESIGN_RESEARCH H11). Use the weakest pad
+// driver (GPIO_DRIVE_CAP_0, ~5 mA) for less contention current and slower
+// edges (EMC); 1-10 kHz bit-bang timing does not need more. UART TX keeps the
+// default. The setting lives in IO_MUX FUN_DRV, which pinMode() (gpio_config:
+// MCU_SEL only) does not touch, so setting it once holds across the drivers'
+// INPUT/OUTPUT switches.
+static void spiPinsLowDrive()
+{
+  static const int8_t pins[] = {
+    PIN_MOSI,
+  #if defined(PIN_CLK)
+    PIN_CLK,
+  #endif
+  #if defined(PIN_CS)
+    PIN_CS,
+  #endif
+  #if defined(PIN_CS_2)
+    PIN_CS_2,
+  #endif
+  };
+  for (int8_t pin : pins)
+  {
+    gpio_drive_cap_t cap = GPIO_DRIVE_CAP_DEFAULT;
+    esp_err_t err = gpio_set_drive_capability((gpio_num_t)pin, GPIO_DRIVE_CAP_0);
+    gpio_get_drive_capability((gpio_num_t)pin, &cap);
+    DBGLN("IO%d drive cap %d%s", pin, (int)cap, err == ESP_OK ? "" : " (set failed)");
+    (void)err;
+  }
+}
+#endif
+
 bool BindingExpired(uint32_t now)
 {
   return (connectionState == binding) && ((now - bindingStart) > NO_BINDING_TIMEOUT);
@@ -604,6 +641,9 @@ void setup()
     connectionState = running;
   }
 
+#if defined(C3HT_SPI_LOW_DRIVE) && defined(PLATFORM_ESP32) && defined(PIN_MOSI)
+  spiPinsLowDrive(); // before the module drives the lines for the first time
+#endif
   vrxModule.Init();
   #if defined(HDZERO_BACKPACK)
     Serial.begin(VRX_UART_BAUD);
