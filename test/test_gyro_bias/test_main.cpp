@@ -382,13 +382,37 @@ void test_still_calibrator()
     TEST_ASSERT_FLOAT_WITHIN(0.02f, 7.5f, cal.mean().axis.x);
     TEST_ASSERT_FLOAT_WITHIN(0.02f, -2.0f, cal.mean().axis.y);
 
-    // a board lying at 1.1 g (wrong accel scale, or being carried in a lift)
+    // an in-spec accel can read 1 g +- ~0.04 g at rest (+-25 mg zero-g offset,
+    // +-1 % sensitivity): still accepted
     cal.begin(s);
     res = StillCalibrator::RUNNING;
     for (i = 0; i < 2000 && res == StillCalibrator::RUNNING; i++)
     {
         FusionVector g = {{gauss(0.07f), gauss(0.07f), gauss(0.07f)}};
-        FusionVector a = {{0.0f, 0.0f, 1.1f}};
+        FusionVector a = {{0.02f + gauss(0.001f), -0.015f + gauss(0.001f), 1.035f + gauss(0.001f)}};
+        res = cal.update(g, a);
+    }
+    TEST_ASSERT_EQUAL_INT(StillCalibrator::ACCEPTED, res);
+
+    // a reading far from 1 g (broken accel, free fall, being shaken)
+    cal.begin(s);
+    res = StillCalibrator::RUNNING;
+    for (i = 0; i < 2000 && res == StillCalibrator::RUNNING; i++)
+    {
+        FusionVector g = {{gauss(0.07f), gauss(0.07f), gauss(0.07f)}};
+        FusionVector a = {{0.0f, 0.0f, 1.2f}};
+        res = cal.update(g, a);
+    }
+    TEST_ASSERT_EQUAL_INT(StillCalibrator::TIMED_OUT, res);
+
+    // linear bumps: the gyro is quiet but the accel norm jumps by 0.05 g
+    // every 0.5 s (walking with the goggles in hand): never a 1 s window
+    cal.begin(s);
+    res = StillCalibrator::RUNNING;
+    for (i = 0; i < 2000 && res == StillCalibrator::RUNNING; i++)
+    {
+        FusionVector g = {{gauss(0.07f), gauss(0.07f), gauss(0.07f)}};
+        FusionVector a = {{0.0f, 0.0f, (i % 50) == 25 ? 1.05f : 1.0f}};
         res = cal.update(g, a);
     }
     TEST_ASSERT_EQUAL_INT(StillCalibrator::TIMED_OUT, res);

@@ -9,8 +9,8 @@
 //
 //  F1 boot calibration (StillCalibrator): drop the first 200 ms, then wait
 //     up to 10 s for a 1 s window in which every gyro axis has a standard
-//     deviation < 0.15 deg/s, |accel| stays within 1 +- 0.03 g and the
-//     gravity direction moves < 0.5 deg. Then the bias is the plain mean of
+//     deviation < 0.15 deg/s, |accel| changes < 0.03 g (and stays within
+//     1 +- 0.15 g) and the gravity direction moves < 0.5 deg. Then the bias is the plain mean of
 //     the next 2 s (same gates). A mean above 3 deg/s on any axis is
 //     rejected (stored calibration kept). The web "ci" command runs the same
 //     routine.
@@ -48,7 +48,8 @@ struct GyroBiasSettings
     float maxBootBiasDps;           // reject a mean above this on any axis
 
     // stillness accel gate (F1 and F2)
-    float accelNormTolG;            // | |a| - 1 g | limit
+    float accelNormTolG;            // |a| change limit against the start of the window/episode
+    float accelNormAbsTolG;         // | |a| - 1 g | sanity limit
     float accelDirTolDeg;           // gravity direction change limit
 
     // F2 runtime estimate
@@ -91,7 +92,7 @@ private:
     bool accelStill(const FusionVector &accel) const;
 
     unsigned int m_discardN, m_gateN, m_meanN, m_timeoutN;
-    float m_stillStd, m_maxBias, m_normTol, m_cosDirTol;
+    float m_stillStd, m_maxBias, m_normTol, m_normAbsTol, m_cosDirTol;
 
     Phase m_phase;
     Result m_result;

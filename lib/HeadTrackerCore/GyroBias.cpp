@@ -19,6 +19,7 @@ GyroBiasSettings GyroBiasDefaultSettings(unsigned int sampleRateHz)
     s.maxBootBiasDps = 3.0f;
 
     s.accelNormTolG = 0.03f;
+    s.accelNormAbsTolG = 0.15f;
     s.accelDirTolDeg = 0.5f;
 
     s.thresholdDps = 1.0f;
@@ -48,19 +49,24 @@ static float clampf(float v, float lo, float hi)
     return v;
 }
 
-static bool accelGate(const FusionVector &accel, const FusionVector &ref, bool checkDir, float normTol, float cosDirTol)
+// Accel part of the stillness test. The norm is compared with the norm at the
+// start of the window/episode, not with 1 g: the ICM-42670-P allows +-25 mg
+// zero-g offset and +-1 % sensitivity per axis, so a resting board can read
+// 1 g +- ~0.04 g and an absolute 0.03 g gate would never pass on such a unit.
+// A loose absolute check (absTol) still rejects free fall and hard shaking.
+static bool accelGate(const FusionVector &accel, const FusionVector &ref, bool hasRef, float normTol, float absTol, float cosDirTol)
 {
     const float n = sqrtf(accel.axis.x * accel.axis.x + accel.axis.y * accel.axis.y + accel.axis.z * accel.axis.z);
-    if (!(fabsf(n - 1.0f) <= normTol))     // also rejects NaN
+    if (!(fabsf(n - 1.0f) <= absTol))      // also rejects NaN
     {
         return false;
     }
-    if (!checkDir)
+    if (!hasRef)
     {
         return true;
     }
     const float nr = sqrtf(ref.axis.x * ref.axis.x + ref.axis.y * ref.axis.y + ref.axis.z * ref.axis.z);
-    if (nr <= 0.0f)
+    if (!(nr > 0.0f) || !(fabsf(n - nr) <= normTol))
     {
         return false;
     }
@@ -82,6 +88,7 @@ void StillCalibrator::begin(const GyroBiasSettings &s)
     m_stillStd = s.stillStdDps;
     m_maxBias = s.maxBootBiasDps;
     m_normTol = s.accelNormTolG;
+    m_normAbsTol = s.accelNormAbsTolG;
     m_cosDirTol = cosf(s.accelDirTolDeg * 0.017453292f);
 
     m_phase = DISCARD;
@@ -136,7 +143,7 @@ StillCalibrator::Result StillCalibrator::update(const FusionVector &gyro, const 
     {
         m_ref = accel;
     }
-    if (!accelGate(accel, m_ref, true, m_normTol, m_cosDirTol))
+    if (!accelGate(accel, m_ref, true, m_normTol, m_normAbsTol, m_cosDirTol))
     {
         restartWindow(GATE, accel);
         return RUNNING;
@@ -288,7 +295,7 @@ FusionVector GyroBiasEstimator::modelBias() const
 
 bool GyroBiasEstimator::accelStill(const FusionVector &accel) const
 {
-    return accelGate(accel, m_ref, m_timer > 0, m_settings.accelNormTolG, m_cosDirTol);
+    return accelGate(accel, m_ref, m_timer > 0, m_settings.accelNormTolG, m_settings.accelNormAbsTolG, m_cosDirTol);
 }
 
 FusionVector GyroBiasEstimator::update(FusionVector gyro, const FusionVector &accel, float temperatureC)
