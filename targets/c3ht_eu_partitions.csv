@@ -2,7 +2,7 @@
 # 'fctry' (NVS) comes AFTER 'nvs': Arduino's initArduino() only ever formats the first
 # NVS partition, so user password, anti-rollback counter and the security log survive.
 # 'c3cred' (raw, subtype 0x40) holds the credential record for flash-provisioned units
-# (Atto/maker), the USB re-key override record and the optional user OTA public key.
+# (Nano/maker), the USB re-key override record and the optional user OTA public key.
 # No SPIFFS: the EU build ignores /options.json.
 # Name,   Type, SubType,  Offset,   Size,     Flags
 nvs,      data, nvs,      0x9000,   0x5000,
