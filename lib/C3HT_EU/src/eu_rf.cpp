@@ -3,8 +3,9 @@
 #include <esp_wifi.h>
 
 /*
- * RF limits (DESIGN.md section 5). 2.0 dBm conducted (API minimum, value 8 in
- * 0.25 dBm units) for SoftAP and ESP-NOW, applied right after esp_wifi_start
+ * RF limits (DESIGN.md section 5). C3HT_EU_MAX_TX_QDBM (0.25 dBm units; default
+ * 78 = 19.5 dBm, the upstream value, c3ht_eu.h) for SoftAP and ESP-NOW,
+ * applied right after esp_wifi_start
  * and after every mode change, then read back. If the read-back is not <= the
  * cap, the radio is stopped (fail closed). 802.11 LR is not enabled in the EU
  * build. BLE: see src/c3ht_eu_hooks.cpp (controller memory released at boot).

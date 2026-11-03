@@ -24,16 +24,15 @@
 #error "EU release build: DEBUG_LOG is not allowed"
 #endif
 
-// RF: esp_wifi_set_max_tx_power() unit is 0.25 dBm; 8 = 2 dBm (API minimum).
-// Per board, chosen so the e.i.r.p. stays <= 10 dBm (EN 300 328 adaptivity out of scope) and <= 13 dBm conducted
-// (EN 62479 20 mW route): U.FL boards (Atto, Mini-1U) with an unknown user antenna keep the 2 dBm default; a board
-// with an integral antenna sets its own cap from its measured installed peak gain (AttoA: 52 = 13 dBm for a peak
-// gain <= -4 dBi, ANTENNA_DESIGN 6) with -D C3HT_EU_MAX_TX_QDBM=<n> in its env.
+// RF: esp_wifi_set_max_tx_power() unit is 0.25 dBm (8 = 2 dBm, the API minimum). Default 78 = 19.5 dBm, the
+// upstream ExpressLRS value, on every board (owner decision 2026-11-03). Applied before the first frame and read
+// back (radio stopped above the cap). EN 300 328 (mean e.i.r.p. <= 20 dBm) is confirmed per board by the lab; if a
+// board measures higher, lower it in its env with -D C3HT_EU_MAX_TX_QDBM=<n>.
 #ifndef C3HT_EU_MAX_TX_QDBM
-#define C3HT_EU_MAX_TX_QDBM 8
+#define C3HT_EU_MAX_TX_QDBM 78
 #endif
-#if (C3HT_EU_MAX_TX_QDBM < 8) || (C3HT_EU_MAX_TX_QDBM > 52)
-#error "C3HT_EU_MAX_TX_QDBM must be 8..52 (2..13 dBm)"
+#if (C3HT_EU_MAX_TX_QDBM < 8) || (C3HT_EU_MAX_TX_QDBM > 78)
+#error "C3HT_EU_MAX_TX_QDBM must be 8..78 (2..19.5 dBm)"
 #endif
 // IMU fitted on every C3HT board: TDK ICM-42607-C, WHO_AM_I 0x61 (the EU selftest requires it).
 #ifndef C3HT_EU_IMU_WHOAMI

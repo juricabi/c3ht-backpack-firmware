@@ -365,7 +365,7 @@ void SetSoftMACAddress()
 
   WiFi.mode(WIFI_STA);
 #if defined(C3HT_EU_BUILD)
-  // EU: 2 dBm cap applied + read back before anything is sent, no LR, channel 1
+  // EU: TX cap (C3HT_EU_MAX_TX_QDBM) applied + read back before anything is sent, no LR, channel 1
   // without the fake WiFi.begin() (which sent probe requests)
   euRadioOk = euEspNowRadioSetup();
 #else
