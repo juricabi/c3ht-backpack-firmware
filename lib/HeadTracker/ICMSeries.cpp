@@ -23,12 +23,16 @@
 #endif
 
 #define ARES (ACCEL_RANGE / 32768)
+
+// last WHO_AM_I read at 0x68 (0 = never probed); the C3HT EU selftest checks it against the fitted part
+uint8_t c3htImuWhoAmI = 0;
 #define GRES (GYRO_RANGE / 32768)
 
 bool ICMSeries::initialize() {
     // Make sure it's one of the supported ICM IMUs
     // ICM42607P, ICM42607C, ICM42670P, ICM42670S, ICM42670T
     int whoami = readRegister(WHO_AM_I);
+    c3htImuWhoAmI = (uint8_t)whoami;
     if (whoami != 0x60 && whoami != 0x61 && whoami != 0x67 && whoami != 0x69 && whoami != 0x64) {
         return false;
     }

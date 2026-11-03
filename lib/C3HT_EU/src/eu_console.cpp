@@ -17,6 +17,8 @@
 #include "options.h"
 #include "devHeadTracker.h"
 
+extern uint8_t c3htImuWhoAmI;      // lib/HeadTracker/ICMSeries.cpp
+
 extern unsigned long rebootTime;
 extern const char *VERSION;
 
@@ -88,12 +90,14 @@ static void cmdSelftest()
     bool parts = euStoreOk() && euCredPartPresent();
     out("partitions   %s\r\n", parts ? "ok" : "FAIL");
     ok &= parts;
-    bool imu = getHeadTrackerState() != STATE_ERROR;
-    out("imu          %s\r\n", imu ? "ok" : "FAIL (not detected)");
+    bool imu = getHeadTrackerState() != STATE_ERROR && c3htImuWhoAmI == C3HT_EU_IMU_WHOAMI;
+    out("imu          who_am_i 0x%02x (want 0x%02x) %s\r\n", (unsigned)c3htImuWhoAmI,
+        (unsigned)C3HT_EU_IMU_WHOAMI, imu ? "ok" : "FAIL");
     ok &= imu;
     int8_t p = euReadTxPower();
     bool pw = p > 0 && p <= C3HT_EU_MAX_TX_QDBM;
-    out("tx power     %d -> %s\r\n", (int)p, pw ? "ok (<= 2 dBm)" : "FAIL");
+    out("tx power     %d (cap %d, 0.25 dBm units) -> %s\r\n", (int)p, (int)C3HT_EU_MAX_TX_QDBM,
+        pw ? "ok" : "FAIL");
     ok &= pw;
     bool ota = esp_ota_get_next_update_partition(nullptr) != nullptr;
     out("ota slot     %s  keys %d\r\n", ota ? "ok" : "FAIL", euOtaKeyCount());

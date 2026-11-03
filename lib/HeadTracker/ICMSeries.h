@@ -4,6 +4,8 @@
 #include "FusionMath.h"
 #include "IMUBase.h"
 
+extern uint8_t c3htImuWhoAmI;      // last WHO_AM_I read by ICMSeries::initialize()
+
 class ICMSeries : public IMUBase {
 public:
     ICMSeries() : IMUBase(0x68) {}
