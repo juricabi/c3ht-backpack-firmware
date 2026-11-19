@@ -124,11 +124,21 @@ second receiver's CS for RX5808 diversity. Power the board through `+`/`G`.
 
 ## Head tracking setup
 
-1. **Radio:** an ExpressLRS TX with a current TX backpack, bound as above. In the Lua **Backpack** folder, set the
-   head-tracking switch and the start channel. Pan, tilt and roll go on three consecutive channels.
+1. **Radio:** an ExpressLRS TX with a current TX backpack, bound as above. In the Lua **Backpack** folder, set
+   **Backpack = On** and **HT Enable = On** (or a switch). Then choose where the head tracking goes with
+   **HT Start Channel**:
+
+   | HT Start Channel | Where pan / tilt / roll go | Needs |
+   |---|---|---|
+   | **EdgeTX** (recommended) | into EdgeTX as trainer inputs **TR1 / TR2 / TR3**. Mix them onto any channels, with switches, limits and per-model settings; the channel monitor shows them. | ExpressLRS 4, TX backpack 1.5.2+, EdgeTX 2.11+. In EdgeTX, Model Setup → **Trainer: Master/CRSF**, then mixes with sources TR1-TR3. |
+   | **Aux1 … Aux10** | the ELRS module overwrites three consecutive receiver channels (Aux6 = Ch 10, 11, 12). EdgeTX never sees them, so look in the flight controller's Receiver tab. | ExpressLRS 3.4+ |
+
+   Use a packet rate that sends enough channels at full precision. A **"Full"** rate (for example 100Hz Full or
+   333Hz Full) gives 16 full-resolution channels. In the Wide/Hybrid switch modes, AUX channels move in coarse steps.
 2. **C3HT web page** (WiFi mode, head-tracking page): set the **board orientation**, run the **calibration** with
-   the goggles still, and **save**. **Set centre** re-centres.
-3. **Aircraft:** map the three channels to the gimbal servos.
+   the goggles still, and **save**. **Set centre** re-centres. Keep the goggles still for a moment at power-up; the
+   gyro calibrates then.
+3. **Aircraft:** map the channels to the gimbal servos.
 
 ## LED
 
@@ -155,11 +165,14 @@ part of this repository.
 
 ## Status
 
-Bench-tested on a C3HT-Nano (November 2026):
-- flashing, WiFi, IMU, binding by phrase;
-- radio → backpack → C3HT control, with an ELRS 4.1 radio and its ESP32-C3 TX backpack.
+Tested on a C3HT-Nano in an Orqa FPV.Connect (November 2026), with an ExpressLRS 4.1 radio and its ESP32-C3 TX
+backpack:
+- flashing, WiFi, IMU and binding by phrase;
+- **band/channel switching of the Orqa goggles from the radio**;
+- **head tracking into EdgeTX** (HT Start Channel = EdgeTX, trainer inputs).
 
-Field tests in goggles are ongoing. Treat it as a new product: check your setup before you fly.
+Not yet tested: Orqa DVR on/off (it needs goggle-side support) and the other goggle types. Treat it as a new product:
+check your setup before you fly.
 
 ## License and credits
 
