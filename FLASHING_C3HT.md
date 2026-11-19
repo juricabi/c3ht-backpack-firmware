@@ -106,6 +106,8 @@ In the radio's Lua, Backpack folder, set the head-tracking switch and start chan
 ## Safety
 
 - **Orqa FPV.Connect slot:** the slot gives **3.3 V**. **Never feed 5 V into `+`** while the board is soldered to it.
+  **Put insulating tape (Kapton) on the bottom of the C3HT-Nano** before you place it; its exposed test pads would
+  otherwise touch the FPV.Connect. Photos of an install are in the [README](README.md#installing).
 - The C3HT-Nano has **no reverse-polarity protection**. Check `+` and `G` before the first power-up.
 - **DVR on/off on Orqa** needs the matching goggle-side firmware. Stock Orqa firmware ignores it; band/channel and
   head tracking work with stock firmware.

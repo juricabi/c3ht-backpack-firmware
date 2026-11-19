@@ -75,12 +75,20 @@ All GPIOs are 3.3 V and **not 5 V tolerant**.
 **Orqa FPV.Connect (C3HT-Nano)**, the same way as a Ghost Atto:
 
 1. Power off and take the FPV.Connect module out.
-2. Bridge the two solder jumpers on its back, as shown in the ImmersionRC Ghost manual.
-3. Put Kapton where the board sits.
-4. The FPV.Connect pads read **G, +, S, T** from left to right. Connect **T to T, S to R, + to +, G to G**.
-5. Connect the U.FL antenna cable.
+2. Bridge the **two solder jumpers** on its back, next to the four pads, as shown in the ImmersionRC Ghost manual
+   (photo below, right). Leave the group of three pads alone.
+3. **Put insulating tape (Kapton) on the bottom of the C3HT-Nano.** Its underside has exposed test pads (BOOT, EN,
+   3.3 V, SPI) that would otherwise touch the FPV.Connect.
+4. Place the Nano in the Ghost Atto spot. The FPV.Connect pads read **G, +, S, T** from left to right. Connect **T to
+   T, S to R, + to +, G to G** with short 30 AWG wires or header-pin offcuts, soldered through.
+5. Antenna: either a small **U.FL whip** on the Nano (photo below, left), or a short U.FL-U.FL cable to the
+   FPV.Connect's own 2.4 GHz PCB antenna (the U.FL socket next to the printed antenna).
 6. Check that `+` and `G` are not shorted. **The Nano has no reverse-polarity protection.**
 7. Power on and enable **Ghost integration** in the goggle menu.
+
+| C3HT-Nano on the FPV.Connect, with a U.FL whip | Back: both jumpers bridged, four pads soldered |
+|---|---|
+| ![C3HT-Nano installed on an Orqa FPV.Connect](docs/img/fpvconnect_c3ht_nano_top.jpg) | ![Back of the FPV.Connect with the jumpers bridged](docs/img/fpvconnect_c3ht_nano_back.jpg) |
 
 > The FPV.Connect pads give **3.3 V**. **Never feed 5 V into `+`** while the board is soldered to the slot.
 
