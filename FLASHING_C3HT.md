@@ -1,7 +1,7 @@
 # Building and flashing C3HT firmware with the ExpressLRS Configurator
 
 This package is the C3HT firmware source, version **1.5.9-c3ht.1**: ExpressLRS Backpack 1.5.9 plus the C3HT
-patches (head tracker, Orqa DVR on/off, brownout handling, power and WiFi fixes). The ExpressLRS Configurator
+patches (head tracker, brownout handling, power and WiFi fixes). The ExpressLRS Configurator
 builds it on your PC with your binding phrase and flashes it. This package contains firmware only, no board design.
 
 ## What you need
@@ -109,5 +109,5 @@ In the radio's Lua, Backpack folder, set the head-tracking switch and start chan
   **Put insulating tape (Kapton) on the bottom of the C3HT-Nano** before you place it; its exposed test pads would
   otherwise touch the FPV.Connect. Photos of an install are in the [README](README.md#installing).
 - The C3HT-Nano has **no reverse-polarity protection**. Check `+` and `G` before the first power-up.
-- **DVR on/off on Orqa** needs the matching goggle-side firmware. Stock Orqa firmware ignores it; band/channel and
-  head tracking work with stock firmware.
+- **Orqa:** enable **Ghost integration** in the goggle menu, then restart the goggles once; before that restart the
+  goggles ignore band/channel changes. Stock Orqa firmware has no DVR control from the backpack.

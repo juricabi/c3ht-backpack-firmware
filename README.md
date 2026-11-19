@@ -16,15 +16,15 @@ README is kept as [`README.upstream.md`](README.upstream.md).
 
 | Goggle / VRx | Link | Configurator device category | Features |
 |---|---|---|---|
-| Orqa (FPV.Connect) | UART, GHST at 100 kbaud | Orqa Goggles FPV.Connect | band/channel, head tracking, DVR record on/off * |
+| Orqa (FPV.Connect) | UART, GHST at 100 kbaud | Orqa Goggles FPV.Connect | band/channel, head tracking * |
 | ImmersionRC rapidFIRE | SPI | rapidFIRE Module | band/channel, head tracking |
 | Skyzone SteadyView receiver | SPI | Skyzone Steadyview (SPI, DIY) | band/channel, head tracking |
 | RX5808, single or diversity | SPI | RX5808 Single / Diversity Module | band/channel, head tracking |
 | Skyzone goggles | UART, MSP | Skyzone Steadyview (MSP, DIY) | band/channel, DVR record, OSD, head tracking |
 | TBS Fusion | UART, MSP | Fusion VRX | band/channel, link/battery telemetry, head tracking |
 
-\* Orqa DVR on/off needs matching support in the goggle firmware. Stock Orqa firmware ignores it; band/channel and
-head tracking work with stock firmware.
+\* With stock Orqa firmware. The Orqa build also sends a DVR record on/off frame (GHST type 0x23); stock Orqa firmware
+ignores it.
 
 In the ExpressLRS Configurator the device is called **C3HT Head Tracker Backpack**.
 
@@ -38,7 +38,8 @@ In the ExpressLRS Configurator the device is called **C3HT Head Tracker Backpack
   - per-axis output scaling;
   - a measured sample period.
 - **Head tracker on the Orqa build** keeps running (upstream's Orqa module skipped it).
-- **Orqa DVR record on/off** over a GHST frame (type 0x23).
+- **Orqa DVR frame**: the Orqa build also sends DVR record on/off as a GHST frame (type 0x23). Stock Orqa firmware
+  ignores it.
 - **Robustness**:
   - an MSP bounds check;
   - the brownout detector armed, with brownouts counted on the web page;
@@ -84,7 +85,8 @@ All GPIOs are 3.3 V and **not 5 V tolerant**.
 5. Antenna: either a small **U.FL whip** on the Nano (photo below, left), or a short U.FL-U.FL cable to the
    FPV.Connect's own 2.4 GHz PCB antenna (the U.FL socket next to the printed antenna).
 6. Check that `+` and `G` are not shorted. **The Nano has no reverse-polarity protection.**
-7. Power on and enable **Ghost integration** in the goggle menu.
+7. Power on, enable **Ghost integration** in the goggle menu, then **restart the goggles**. They only pick the setting
+   up at start-up; until then band/channel changes from the radio are ignored. You do this once: the setting stays on.
 
 | C3HT-Nano on the FPV.Connect, with a U.FL whip | Back: both jumpers bridged, four pads soldered |
 |---|---|
@@ -171,7 +173,7 @@ backpack:
 - **band/channel switching of the Orqa goggles from the radio**;
 - **head tracking into EdgeTX** (HT Start Channel = EdgeTX, trainer inputs).
 
-Not yet tested: Orqa DVR on/off (it needs goggle-side support) and the other goggle types. Treat it as a new product:
+Not yet tested: the other goggle types. Treat it as a new product:
 check your setup before you fly.
 
 ## License and credits
