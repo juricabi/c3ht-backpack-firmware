@@ -57,7 +57,7 @@ Any of these works:
   once the C3HT and the radio's backpack share the binding phrase.
 - **Power-cycles:** power-cycle the goggles **3 times**, leaving them on for about 3 s each time (at least 1.5 s
   counts), then leave them on. With a binding phrase compiled in, this starts WiFi. Without one, it starts binding mode.
-- **BOOT:** a **short** press, under half a second (C3HT-Nano: briefly bridge the JP1 pads **B** and **G**).
+- **BOOT:** a **short** press, under half a second (C3HT-Nano: briefly short the top pad **B** to the U.FL shell; first-batch boards and the NanoA: pads **B** and **G**).
 
 WiFi mode: the LED flickers fast. The network is **ExpressLRS VRx Backpack** (password `expresslrs`), and the web page
 is at **http://10.0.0.1**, or at **http://elrs_vrx.local** once you have saved your home network there.
@@ -85,8 +85,8 @@ Use a USB-UART adapter set to **3.3 V logic**:
 | VCC | + |
 | GND | G |
 
-1. Hold BOOT low while you apply power (C3HT-Nano: bridge the JP1 pads **B** and **G** while plugging the adapter's
-   USB in; C3HT-Mini: press the button). Release after about a second.
+1. Hold BOOT low while you apply power (C3HT-Nano: short the top pad **B** to the U.FL shell, or on first-batch
+   boards and the NanoA the pads **B** and **G**, while plugging the adapter's USB in; C3HT-Mini: press the button). Release after about a second.
 2. In the Configurator choose the **UART** flashing method and the adapter's COM port, then **Build & Flash**.
 3. Power-cycle without BOOT.
 

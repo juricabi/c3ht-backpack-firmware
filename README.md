@@ -66,7 +66,7 @@ All boards use one pin map:
 | + | – | hole **+** | supply, **3.3 to 5.5 V** |
 | G | GND | hole **G** | ground |
 | MOSI / CLK / CS / CS2 | IO6 / IO7 / IO10 / IO2 | bottom pads | SPI receivers (rapidFIRE, SteadyView, RX5808) |
-| BOOT | IO9 | JP1 pads **B**/**G** (Nano), button (Mini) | low at power-up: download mode; short press: WiFi |
+| BOOT | IO9 | top pad **B** to the U.FL shell (Nano; first batch and NanoA: pads **B**/**G**), button (Mini) | low at power-up: download mode; short press: WiFi |
 | LED | IO8 | on board | status, active low |
 
 All GPIOs are 3.3 V and **not 5 V tolerant**.
