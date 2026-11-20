@@ -30,6 +30,9 @@ In the ExpressLRS Configurator the device is called **C3HT Head Tracker Backpack
 
 ## What the C3HT changes add to Backpack 1.5.9
 
+The firmware behaves like the standard ExpressLRS Backpack: WiFi mode, binding and the 3-power-cycle trigger are
+unchanged, and it is built and flashed the same way. On top of that it adds:
+
 - **C3HT targets**: one pin map for all C3HT boards, one build per goggle type.
 - **Head tracker**:
   - ICM-42607-C driver at ±1000 dps / ±4 g with I2C bus recovery;
@@ -37,16 +40,16 @@ In the ExpressLRS Configurator the device is called **C3HT Head Tracker Backpack
   - run-time gyro-bias tracking with temperature compensation;
   - per-axis output scaling;
   - a measured sample period.
-- **Head tracker on the Orqa build** keeps running (upstream's Orqa module skipped it).
+- **Head tracker on the Skyzone MSP build**: head tracking from the on-board IMU is sent to the radio (upstream's
+  MSP module did not send it).
 - **Orqa DVR frame**: the Orqa build also sends DVR record on/off as a GHST frame (type 0x23). Stock Orqa firmware
   ignores it.
 - **Robustness**:
   - an MSP bounds check;
   - the brownout detector armed, with brownouts counted on the web page;
+  - length checks on the web page's inputs;
   - queued ESP-NOW packets no longer block a reboot.
 - **Radio power**: the ExpressLRS default of 19.5 dBm.
-
-WiFi mode, binding and the 3-power-cycle trigger behave as in the standard ExpressLRS Backpack.
 
 ## C3HT boards
 
@@ -107,7 +110,10 @@ second receiver's CS for RX5808 diversity. Power the board through `+`/`G`.
   1. Download the source zip from [Releases](../../releases). It includes git, so the version shows correctly.
   2. Unpack it to a short path.
   3. In the Configurator open **Backpack → LOCAL**, choose that folder, the device **C3HT Head Tracker Backpack**,
-     enter your **binding phrase**, and flash over **WiFi** or **UART**.
+     enter your **binding phrase** (and your home WiFi, if you want), and flash over **WiFi** or **UART**.
+
+  The C3HT is listed only under **LOCAL**. It is not in the Configurator's official releases, because it is not part
+  of upstream ExpressLRS.
 - **Ready-built images** from [Releases](../../releases), one zip per goggle type:
   - upload `firmware.bin` on the C3HT's web page (WiFi mode, http://10.0.0.1, **Update**), or
   - flash all four files with esptool for a blank board.
@@ -137,9 +143,14 @@ second receiver's CS for RX5808 diversity. Power the board through `+`/`G`.
 
    Use a packet rate that sends enough channels at full precision. A **"Full"** rate (for example 100Hz Full or
    333Hz Full) gives 16 full-resolution channels. In the Wide/Hybrid switch modes, AUX channels move in coarse steps.
-2. **C3HT web page** (WiFi mode, head-tracking page): set the **board orientation**, run the **calibration** with
-   the goggles still, and **save**. **Set centre** re-centres. Keep the goggles still for a moment at power-up; the
-   gyro calibrates then. A C3HT-Nano in the Orqa FPV.Connect slot needs **Pitch/Tilt 0, Roll 90, Yaw/Pan 0**.
+2. **C3HT web page** (WiFi mode, **Head Tracking** tab):
+   - Set the **board orientation** so that the plane on the page moves like the goggles, then press
+     **Save Board Orientation**. A C3HT-Nano in the Orqa FPV.Connect slot needs
+     **Pitch/Tilt 0, Roll 90, Yaw/Pan 0**.
+   - Press **Calibrate Gyro** with the goggles lying still.
+   - **Reset Center** re-centres.
+
+   Keep the goggles still for a moment at power-up; the gyro calibrates then.
 3. **Aircraft:** map the channels to the gimbal servos.
 
 ## LED
@@ -148,7 +159,7 @@ second receiver's CS for RX5808 diversity. Power the board through `+`/`G`.
 |---|---|
 | solid on, short off-blinks | normal; each blink is a received packet |
 | two blinks, pause | binding mode (2 minutes, then WiFi) |
-| fast flicker | WiFi mode |
+| fast flicker | WiFi mode: the web page works, the radio is not listened to; power-cycle the goggles to leave |
 
 ## Versions and building from source
 
@@ -162,19 +173,28 @@ cd c3ht-backpack-firmware
 pio run -e C3HT_Orqa_via_UART      # or C3HT_Rapidfire, C3HT_SteadyView, C3HT_RX5808, C3HT_SkyzoneMSP, C3HT_Fusion
 ```
 
+The binding phrase and the home WiFi are build variables, as in every ExpressLRS Backpack. The Configurator sets them
+for you; for a command-line build put them in `user_defines.txt`:
+
+```
+-DMY_BINDING_PHRASE="your phrase"
+-DHOME_WIFI_SSID="your network"
+-DHOME_WIFI_PASSWORD="its password"
+```
+
 Envs `C3HTEU_*` are an EU build with a per-device password and signed updates; they need signing keys that are not
 part of this repository.
 
 ## Status
 
-Tested on a C3HT-Nano in an Orqa FPV.Connect (November 2026), with an ExpressLRS 4.1 radio and its ESP32-C3 TX
-backpack:
-- flashing, WiFi, IMU and binding by phrase;
+Tested on a C3HT-Nano in Orqa goggles (FPV.Connect slot, November 2026), with an ExpressLRS 4.1 radio and its
+ESP32-C3 TX backpack:
+- flashing, updating over WiFi, the web page, IMU and binding by phrase;
 - **band/channel switching of the Orqa goggles from the radio**;
-- **head tracking into EdgeTX** (HT Start Channel = EdgeTX, trainer inputs).
+- **head tracking into EdgeTX** (HT Start Channel = EdgeTX, trainer inputs), with the board orientation above;
+- DVR record on/off, which needs matching goggle firmware.
 
-Not yet tested: the other goggle types. Treat it as a new product:
-check your setup before you fly.
+Not yet tested: the other goggle types. Treat it as a new product: check your setup before you fly.
 
 ## License and credits
 

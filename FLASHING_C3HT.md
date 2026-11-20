@@ -26,6 +26,7 @@ A C3HT arrives with the standard firmware and no binding phrase. It starts in no
 ## Build and flash (Configurator, Backpack tab)
 
 1. **Backpack**, then **LOCAL**, then **CHOOSE FOLDER**: pick this folder (the one with `platformio.ini`).
+   The C3HT is listed only under LOCAL, not in the Configurator's official releases.
 2. **Target**: choose the goggle or receiver, then **C3HT Head Tracker Backpack**:
 
    | Goggle / VRx | Device category | Device |
@@ -38,7 +39,8 @@ A C3HT arrives with the standard firmware and no binding phrase. It starts in no
    | Skyzone goggles (MSP) | Skyzone Steadyview | C3HT Head Tracker Backpack, MSP (DIY) |
    | TBS Fusion | Fusion VRX | C3HT Head Tracker Backpack |
 
-3. **Device options**: enter your **binding phrase**.
+3. **Device options**: enter your **binding phrase**. You can also enter your home WiFi name and password; the C3HT
+   then joins that network in WiFi mode.
 4. **Flashing method**:
    - **WiFi** for a board that already runs C3HT firmware. Put it into WiFi mode first (see below), then
      press **Build & Flash**. It uploads to `elrs_vrx.local`, so the PC and the C3HT must be on the same network.
@@ -96,14 +98,19 @@ connected. Their 3.3 V VCC pin is weak (about 50 mA), but that is enough for fla
 
 ## Head tracker
 
-In the web page (WiFi mode), head-tracking page:
+In the web page (WiFi mode), **Head Tracking** tab:
 
-1. Set the **board orientation** to match how the board is mounted. A C3HT-Nano in the Orqa FPV.Connect slot needs
+1. Set the **board orientation** so that the plane on the page moves like the goggles: nod down and its nose goes
+   down, lean right and it banks right. A C3HT-Nano in the Orqa FPV.Connect slot needs
    **Pitch/Tilt 0, Roll 90, Yaw/Pan 0**.
-2. Run the **calibration** with the goggles still.
-3. Save.
+2. Press **Save Board Orientation**.
+3. Press **Calibrate Gyro** with the goggles lying still.
+4. Hold the goggles as you wear them, look straight ahead and press **Reset Center**.
 
-In the radio's Lua, Backpack folder, set the head-tracking switch and start channel.
+The plane moves more smoothly when your phone or PC is joined to the C3HT's own network than over your home network.
+
+In the radio's Lua, Backpack folder, set the head-tracking switch and start channel. Power-cycle the goggles to leave
+WiFi mode before you fly: the C3HT sends no head tracking while WiFi is on.
 
 ## Safety
 
