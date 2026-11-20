@@ -47,16 +47,4 @@ static_assert(brownoutCountOnBoot(true, false, true, 0xFFFF) == 0xFFFF, "saturat
 static_assert(brownoutCountOnBoot(true, false, false, 4) == 4, "WDT/SW reset keeps count");
 static_assert(brownoutCountOnBoot(false, false, false, 4) == 0, "WDT/SW reset, record lost");
 
-// --- never-bound group address ---
-static constexpr uint8_t kAddrZero[6] = {0, 0, 0, 0, 0, 0};
-static constexpr uint8_t kAddrErased[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-static constexpr uint8_t kAddrPhrase[6] = {0x35, 0x5c, 0x1a, 0x08, 0x38, 0x18};   // a real phrase UID
-static constexpr uint8_t kAddrOneByte[6] = {0, 0, 0, 0, 0, 1};
-static constexpr uint8_t kAddrMixed[6] = {0, 0, 0, 0xFF, 0xFF, 0xFF};
-static_assert(groupAddressUnset(kAddrZero), "fresh config is unbound");
-static_assert(groupAddressUnset(kAddrErased), "erased flash is unbound");
-static_assert(!groupAddressUnset(kAddrPhrase), "a phrase UID is bound");
-static_assert(!groupAddressUnset(kAddrOneByte), "one set byte is bound");
-static_assert(!groupAddressUnset(kAddrMixed), "mixed 00/FF is a real address");
-
 #endif

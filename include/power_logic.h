@@ -77,20 +77,3 @@ constexpr uint16_t brownoutCountOnBoot(bool recordValid, bool powerOnReset, bool
          ? (uint16_t)(brownoutBase(recordValid, powerOnReset, stored) + 1)
          : brownoutBase(recordValid, powerOnReset, stored);
 }
-
-/////////// Never-bound VRx backpack ///////////
-// A VRx backpack that was never bound, by the radio or by a phrase set on its web page, has an all-zero group
-// address (fresh config) or an all-0xFF one (erased flash). Such a board starts binding mode by itself at a
-// real power-on.
-
-constexpr bool groupAddressByteUnset(uint8_t b0, uint8_t b)
-{
-    return (b0 == 0x00 || b0 == 0xFF) && b == b0;
-}
-
-constexpr bool groupAddressUnset(const uint8_t a[6])
-{
-    return groupAddressByteUnset(a[0], a[0]) && groupAddressByteUnset(a[0], a[1]) &&
-           groupAddressByteUnset(a[0], a[2]) && groupAddressByteUnset(a[0], a[3]) &&
-           groupAddressByteUnset(a[0], a[4]) && groupAddressByteUnset(a[0], a[5]);
-}

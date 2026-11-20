@@ -477,20 +477,6 @@ void checkIfInBindingMode()
     break;
   }
 
-#if !defined(C3HT_EU_BUILD)
-  // A board that was never bound (no phrase built in, no address stored) starts binding mode by itself at a real
-  // power-on. A new user then needs no power-cycle sequence: bind from the radio's Lua, or wait 2 minutes for WiFi
-  // and set a binding phrase on the web page. Software, watchdog and brownout resets do not start it, so the
-  // reboot after the WiFi idle timeout cannot loop back into binding.
-  if (connectionState != binding && !firmwareOptions.hasUID && groupAddressUnset(config.GetGroupAddress()) &&
-      reason == ESP_RST_POWERON)
-  {
-    connectionState = binding;
-    bindingStart = millis();
-    DBGLN("never bound: binding mode at power-on");
-  }
-#endif
-
   DBGLN(""); // blank line to clear below prints from serial boot garbage
   DBGLN("reset reason = %d, bootCounter = %u%s", (int)reason, stored,
         bootCountPending ? " (+1 after 1.5 s)" : "");

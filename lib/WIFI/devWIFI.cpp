@@ -50,10 +50,6 @@
 #endif
 extern VrxBackpackConfig config;
 extern bool sendRTCChangesToVrx;
-#if !defined(C3HT_EU_BUILD)
-#include <MD5Builder.h>
-#define WEB_BINDING_PHRASE   // bind by phrase on the web page (/setbind)
-#endif
 #elif defined(TARGET_TX_BACKPACK)
 extern TxBackpackConfig config;
 extern wifi_service_t wifiService;
@@ -375,70 +371,11 @@ static void GetConfiguration(AsyncWebServerRequest *request)
   {
     json["config"]["rssi"] = WiFi.RSSI();
   }
-#if defined(WEB_BINDING_PHRASE)
-  {
-    // The address this backpack listens to: a phrase built into the firmware wins over a stored bind.
-    const uint8_t *a = firmwareOptions.hasUID ? firmwareOptions.uid : config.GetGroupAddress();
-    char uid[18];
-    snprintf(uid, sizeof(uid), "%02x:%02x:%02x:%02x:%02x:%02x", a[0], a[1], a[2], a[3], a[4], a[5]);
-    json["config"]["bind"]["builtin"] = firmwareOptions.hasUID;
-    json["config"]["bind"]["bound"] = firmwareOptions.hasUID || !groupAddressUnset(a);
-    json["config"]["bind"]["uid"] = uid;
-  }
-#endif
 
   AsyncResponseStream *response = request->beginResponseStream("application/json");
   serializeJson(json, *response);
   request->send(response);
 }
-
-#if defined(WEB_BINDING_PHRASE)
-// Bind by binding phrase from the web page. The address is the one the ExpressLRS Configurator derives from a
-// phrase: the first 6 bytes of md5("-DMY_BINDING_PHRASE=\"<phrase>\""), the phrase taken exactly as typed. It is
-// stored as the group address, where a bind from the radio also goes. "unbind" clears it. A phrase built into the
-// firmware takes precedence, so binding here is refused then. The backpack restarts into normal mode afterwards.
-static void WebUpdateSetBind(AsyncWebServerRequest *request)
-{
-  noteClientActivity();
-  if (firmwareOptions.hasUID)
-  {
-    request->send(409, "text/plain", "This firmware has a binding phrase built in. Flash a build without one to bind here.");
-    return;
-  }
-  uint8_t address[6] = {0, 0, 0, 0, 0, 0};
-  const bool unbind = request->hasArg("unbind");
-  if (!unbind)
-  {
-    String phrase = request->arg("phrase");
-    if (phrase.length() == 0 || phrase.length() > 64)
-    {
-      request->send(400, "text/plain", "Enter a binding phrase of 1 to 64 characters.");
-      return;
-    }
-    for (size_t i = 0; i < phrase.length(); i++)
-    {
-      if (phrase[i] < 0x20 || phrase[i] > 0x7e)
-      {
-        request->send(400, "text/plain", "Use letters, digits, spaces and punctuation only.");
-        return;
-      }
-    }
-    MD5Builder md5;
-    md5.begin();
-    md5.add(String("-DMY_BINDING_PHRASE=\"") + phrase + "\"");
-    md5.calculate();
-    uint8_t digest[16];
-    md5.getBytes(digest);
-    memcpy(address, digest, sizeof(address));
-  }
-  DBGLN("Web bind: %s", unbind ? "cleared" : "set from phrase");
-  config.SetGroupAddress(address);
-  config.Commit();
-  request->send(200, "text/plain", unbind ? "Unbound. The backpack restarts now."
-                                         : "Bound. The backpack restarts now and listens to your radio.");
-  rebootTime = millis() + 500;   // let the reply go out first
-}
-#endif
 
 static void WebUpdateSendNetworks(AsyncWebServerRequest *request)
 {
@@ -916,9 +853,6 @@ static void startServices()
   server.on("/config", HTTP_GET, GetConfiguration);
   server.on("/networks.json", WebUpdateSendNetworks);
   server.on("/sethome", WebUpdateSetHome);
-#if defined(WEB_BINDING_PHRASE)
-  server.on("/setbind", HTTP_POST, WebUpdateSetBind);
-#endif
   #if defined(MAVLINK_ENABLED)
   server.on("/setmavlink", WebUpdateSetMavLink);
   #endif

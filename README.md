@@ -43,10 +43,10 @@ In the ExpressLRS Configurator the device is called **C3HT Head Tracker Backpack
 - **Robustness**:
   - an MSP bounds check;
   - the brownout detector armed, with brownouts counted on the web page;
-  - only real power-ons count for the 3-power-cycle trigger;
-  - WiFi mode ends after 5 minutes without a client;
   - queued ESP-NOW packets no longer block a reboot.
 - **Radio power**: the ExpressLRS default of 19.5 dBm.
+
+WiFi mode, binding and the 3-power-cycle trigger behave as in the standard ExpressLRS Backpack.
 
 ## C3HT boards
 
@@ -139,7 +139,7 @@ second receiver's CS for RX5808 diversity. Power the board through `+`/`G`.
    333Hz Full) gives 16 full-resolution channels. In the Wide/Hybrid switch modes, AUX channels move in coarse steps.
 2. **C3HT web page** (WiFi mode, head-tracking page): set the **board orientation**, run the **calibration** with
    the goggles still, and **save**. **Set centre** re-centres. Keep the goggles still for a moment at power-up; the
-   gyro calibrates then.
+   gyro calibrates then. A C3HT-Nano in the Orqa FPV.Connect slot needs **Pitch/Tilt 0, Roll 90, Yaw/Pan 0**.
 3. **Aircraft:** map the channels to the gimbal servos.
 
 ## LED

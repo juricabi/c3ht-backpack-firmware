@@ -30,7 +30,6 @@
 					<li id="rtctab" style="display:none;"><a data-mui-toggle="tab" data-mui-controls="pane-justified-3">RTC Time</a></li>
 					<li id="aattab" style="display:none;"><a data-mui-toggle="tab" data-mui-controls="pane-justified-4">Antenna Tracking</a></li>
 					<li id="httab" style="display:none;"><a data-mui-toggle="tab" data-mui-controls="pane-ht">Head Tracking</a></li>
-					<li id="bindtab" style="display:none;"><a data-mui-toggle="tab" data-mui-controls="pane-bind">Binding</a></li>
 				</ul>
 
 				<div class="mui-tabs__pane mui--is-active" id="pane-justified-1">
@@ -142,27 +141,6 @@
 								<button id='reset-board' class="mui-btn mui-btn--small mui-btn--primary">Reset Board Orientation</button>
 								<button id='save-orientation' class="mui-btn mui-btn--small mui-btn--primary">Save Board Orientation</button>
 							</div>
-						</div>
-					</div>
-				</div>
-
-				<div class="mui-tabs__pane" id="pane-bind">
-					<div class="mui-panel">
-						<h2>Binding</h2>
-						<p id="bindstate"></p>
-						<div id="bindforms">
-							<p>Enter the same binding phrase as your radio. Your radio's TX backpack must use this phrase
-								too (flash it in the ExpressLRS Configurator's Backpack tab).</p>
-							<form action="/setbind" id="setbind" method="POST" autocomplete="off" class="mui-form">
-								<div class="mui-textfield">
-									<input id="bindphrase" type="text" name="phrase" maxlength="64" placeholder="Binding phrase">
-								</div>
-								<button type="submit" class="mui-btn mui-btn--primary">Bind</button>
-							</form>
-							<form action="/setbind" id="unbind" method="POST" class="mui-form">
-								<input type="hidden" name="unbind" value="1">
-								<button type="submit" class="mui-btn">Unbind</button>
-							</form>
 						</div>
 					</div>
 				</div>

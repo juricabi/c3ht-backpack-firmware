@@ -55,13 +55,14 @@ Any of these works:
 
 - **From the radio:** in the ExpressLRS Lua, open **WiFi Connectivity** and press **Enable VRx WiFi**. This only works
   once the C3HT and the radio's backpack share the binding phrase.
-- **Power-cycles:** power-cycle the goggles **3 times**, leaving them on for about 3 s each time (at least 1.5 s
-  counts), then leave them on. With a binding phrase compiled in, this starts WiFi. Without one, it starts binding mode.
+- **Power-cycles:** power-cycle the goggles **3 times**, leaving them on for about 3 s each time, then leave
+  them on. With a binding phrase compiled in, this starts WiFi. Without one, it starts binding mode.
 - **BOOT:** a **short** press, under half a second (C3HT-Nano: briefly short the top pad **B** to the U.FL shell; first-batch boards and the NanoA: pads **B** and **G**).
 
 WiFi mode: the LED flickers fast. The network is **ExpressLRS VRx Backpack** (password `expresslrs`), and the web page
 is at **http://10.0.0.1**, or at **http://elrs_vrx.local** once you have saved your home network there.
-WiFi mode ends after 5 minutes without a client.
+WiFi mode stays on until you power-cycle the goggles. While it is on, the C3HT does not listen to the radio: band/channel,
+DVR and head tracking work again after the power-cycle.
 
 ## Binding
 
@@ -97,7 +98,8 @@ connected. Their 3.3 V VCC pin is weak (about 50 mA), but that is enough for fla
 
 In the web page (WiFi mode), head-tracking page:
 
-1. Set the **board orientation** to match how the board is mounted.
+1. Set the **board orientation** to match how the board is mounted. A C3HT-Nano in the Orqa FPV.Connect slot needs
+   **Pitch/Tilt 0, Roll 90, Yaw/Pan 0**.
 2. Run the **calibration** with the goggles still.
 3. Save.
 

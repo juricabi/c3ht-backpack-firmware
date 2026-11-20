@@ -151,16 +151,6 @@ function updateConfig(data) {
         r.textContent = 'Last reset: ' + config.reset.reason + ', brownouts since power-on: ' + config.reset.brownouts +
             (config.reset.bod_armed ? '' : ' (brownout detector OFF)');
     }
-    if (config.bind && _('bindtab')) {
-        _('bindtab').style.display = 'table-cell';
-        if (config.bind.builtin) {
-            _('bindstate').textContent = 'Bound by a binding phrase built into this firmware (address ' + config.bind.uid + ').';
-            _('bindforms').style.display = 'none';
-        } else {
-            _('bindstate').textContent = config.bind.bound ? 'Bound (address ' + config.bind.uid + ').'
-                : 'Not bound. Enter your binding phrase below, or bind from the radio.';
-        }
-    }
 
     updateAatConfig(config);
 }
@@ -532,28 +522,6 @@ _('forget').addEventListener('click', callback("Forget Home Network", "An error 
 if (_('setrtc')) _('setrtc').addEventListener('submit', callback("Set RTC Time", "An error occurred setting the RTC time", "/setrtc", function() {
     return new FormData(_('setrtc'));
 }));
-
-// Binding by phrase: show the backpack's own answer, also when it refuses (phrase built in, bad phrase).
-function bindSubmit(form) {
-    return function(e) {
-        e.stopPropagation();
-        e.preventDefault();
-        const req = new XMLHttpRequest();
-        req.onreadystatechange = function () {
-            if (this.readyState == 4) {
-                cuteAlert({
-                    type: this.status == 200 ? "success" : "error",
-                    title: "Binding",
-                    message: this.responseText || "The backpack did not answer."
-                });
-            }
-        };
-        req.open("POST", "/setbind", true);
-        req.send(new FormData(form));
-    }
-}
-if (_('setbind')) _('setbind').addEventListener('submit', bindSubmit(_('setbind')));
-if (_('unbind')) _('unbind').addEventListener('submit', bindSubmit(_('unbind')));
 
 //=========================================================
 
