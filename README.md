@@ -28,6 +28,12 @@ ignores it.
 
 In the ExpressLRS Configurator the device is called **C3HT Head Tracker Backpack**.
 
+**Without head tracking.** Each target also comes as `C3HT_<target>_NoHT` (Configurator device **C3HT Backpack,
+no head tracking**). It is the same firmware built without head tracking. The IMU is not used, and nothing goes
+back to the radio when it turns head tracking on. Use it with a goggle that has its own head tracker, so the two do
+not both send: for example an HDZero goggle with a rapidFIRE-mode module in its bay. The SkyzoneMSP one passes the
+Skyzone goggle's own head tracking through, as the upstream Skyzone backpack does.
+
 ## What the C3HT changes add to Backpack 1.5.9
 
 The firmware behaves like the standard ExpressLRS Backpack: WiFi mode, binding and the 3-power-cycle trigger are
@@ -171,6 +177,7 @@ reports `ver.unknown`.
 git clone --branch 1.5.9-c3ht.1 https://github.com/juricabi/c3ht-backpack-firmware
 cd c3ht-backpack-firmware
 pio run -e C3HT_Orqa_via_UART      # or C3HT_Rapidfire, C3HT_SteadyView, C3HT_RX5808, C3HT_SkyzoneMSP, C3HT_Fusion
+                                   # no head tracking: C3HT_Orqa_NoHT_via_UART, C3HT_Rapidfire_NoHT_via_UART, ...
 ```
 
 The binding phrase and the home WiFi are build variables, as in every ExpressLRS Backpack. The Configurator sets them

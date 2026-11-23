@@ -39,6 +39,9 @@ A C3HT arrives with the standard firmware and no binding phrase. It starts in no
    | Skyzone goggles (MSP) | Skyzone Steadyview | C3HT Head Tracker Backpack, MSP (DIY) |
    | TBS Fusion | Fusion VRX | C3HT Head Tracker Backpack |
 
+   Each of them also lists **C3HT Backpack, no head tracking** (Skyzone: "..., SPI (DIY)" and "..., MSP (DIY)"):
+   the same firmware without head tracking, for a goggle that has its own head tracker.
+
 3. **Device options**: enter your **binding phrase**. You can also enter your home WiFi name and password; the C3HT
    then joins that network in WiFi mode.
 4. **Flashing method**:

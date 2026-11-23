@@ -530,6 +530,12 @@
                 "firmware": "C3HT_Fusion",
                 "upload_methods": ["uart", "wifi"],
                 "platform": "esp32-c3"
+            },
+            "c3ht-noht": {
+                "product_name": "C3HT Backpack, no head tracking",
+                "firmware": "C3HT_Fusion_NoHT",
+                "upload_methods": ["uart", "wifi"],
+                "platform": "esp32-c3"
             }
         }
     },
@@ -627,6 +633,12 @@
                 "firmware": "C3HT_Rapidfire",
                 "upload_methods": ["uart", "wifi"],
                 "platform": "esp32-c3"
+            },
+            "c3ht-noht": {
+                "product_name": "C3HT Backpack, no head tracking",
+                "firmware": "C3HT_Rapidfire_NoHT",
+                "upload_methods": ["uart", "wifi"],
+                "platform": "esp32-c3"
             }
         }
     },
@@ -662,6 +674,12 @@
                 "firmware": "C3HT_RX5808",
                 "upload_methods": ["uart", "wifi"],
                 "platform": "esp32-c3"
+            },
+            "c3ht-noht": {
+                "product_name": "C3HT Backpack, no head tracking",
+                "firmware": "C3HT_RX5808_NoHT",
+                "upload_methods": ["uart", "wifi"],
+                "platform": "esp32-c3"
             }
         }
     },
@@ -677,6 +695,12 @@
             "c3ht": {
                 "product_name": "C3HT Head Tracker Backpack",
                 "firmware": "C3HT_RX5808",
+                "upload_methods": ["uart", "wifi"],
+                "platform": "esp32-c3"
+            },
+            "c3ht-noht": {
+                "product_name": "C3HT Backpack, no head tracking",
+                "firmware": "C3HT_RX5808_NoHT",
                 "upload_methods": ["uart", "wifi"],
                 "platform": "esp32-c3"
             }
@@ -715,9 +739,21 @@
                 "upload_methods": ["uart", "wifi"],
                 "platform": "esp32-c3"
             },
+            "c3ht-noht": {
+                "product_name": "C3HT Backpack, no head tracking, SPI (DIY)",
+                "firmware": "C3HT_SteadyView_NoHT",
+                "upload_methods": ["uart", "wifi"],
+                "platform": "esp32-c3"
+            },
             "c3ht-msp": {
                 "product_name": "C3HT Head Tracker Backpack, MSP (DIY)",
                 "firmware": "C3HT_SkyzoneMSP",
+                "upload_methods": ["uart", "wifi"],
+                "platform": "esp32-c3"
+            },
+            "c3ht-msp-noht": {
+                "product_name": "C3HT Backpack, no head tracking, MSP (DIY)",
+                "firmware": "C3HT_SkyzoneMSP_NoHT",
                 "upload_methods": ["uart", "wifi"],
                 "platform": "esp32-c3"
             }
@@ -747,6 +783,12 @@
             "c3ht": {
                 "product_name": "C3HT Head Tracker Backpack",
                 "firmware": "C3HT_Orqa",
+                "upload_methods": ["uart", "wifi"],
+                "platform": "esp32-c3"
+            },
+            "c3ht-noht": {
+                "product_name": "C3HT Backpack, no head tracking",
+                "firmware": "C3HT_Orqa_NoHT",
                 "upload_methods": ["uart", "wifi"],
                 "platform": "esp32-c3"
             }
