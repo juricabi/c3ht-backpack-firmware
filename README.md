@@ -174,7 +174,7 @@ So build from a git checkout (or the release source zip), not from GitHub's plai
 reports `ver.unknown`.
 
 ```
-git clone --branch 1.5.9-c3ht.1 https://github.com/juricabi/c3ht-backpack-firmware
+git clone --branch 1.5.9-c3ht.2 https://github.com/juricabi/c3ht-backpack-firmware
 cd c3ht-backpack-firmware
 pio run -e C3HT_Orqa_via_UART      # or C3HT_Rapidfire, C3HT_SteadyView, C3HT_RX5808, C3HT_SkyzoneMSP, C3HT_Fusion
                                    # no head tracking: C3HT_Orqa_NoHT_via_UART, C3HT_Rapidfire_NoHT_via_UART, ...
@@ -201,7 +201,8 @@ ESP32-C3 TX backpack:
 - **head tracking into EdgeTX** (HT Start Channel = EdgeTX, trainer inputs), with the board orientation above;
 - DVR record on/off, which needs matching goggle firmware.
 
-Not yet tested: the other goggle types. Treat it as a new product: check your setup before you fly.
+Not yet tested: the other goggle types, and the `_NoHT` builds (new in 1.5.9-c3ht.2). Treat it as a new product:
+check your setup before you fly.
 
 ## License and credits
 

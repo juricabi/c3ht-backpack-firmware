@@ -1,13 +1,13 @@
 # Building and flashing C3HT firmware with the ExpressLRS Configurator
 
-This package is the C3HT firmware source, version **1.5.9-c3ht.1**: ExpressLRS Backpack 1.5.9 plus the C3HT
+This package is the C3HT firmware source, version **1.5.9-c3ht.2**: ExpressLRS Backpack 1.5.9 plus the C3HT
 patches (head tracker, brownout handling, power and WiFi fixes). The ExpressLRS Configurator
 builds it on your PC with your binding phrase and flashes it. This package contains firmware only, no board design.
 
 ## What you need
 
 - **ExpressLRS Configurator** 1.8 or newer, with **git** installed (the Configurator needs it).
-- This folder, unpacked to a **short path** such as `C:\c3ht\c3ht-1.5.9-c3ht.1`. Long paths break the build on Windows.
+- This folder, unpacked to a **short path** such as `C:\c3ht\c3ht-1.5.9-c3ht.2`. Long paths break the build on Windows.
 - The **binding phrase** of your radio. **Your radio's TX backpack must use the same phrase** (see Binding below).
 
 ## New board: first setup
@@ -52,7 +52,7 @@ A C3HT arrives with the standard firmware and no binding phrase. It starts in no
    - **UART** for a blank board (first flash, see below).
 5. After flashing, the C3HT restarts. The LED is **solid on** in normal mode.
 
-The firmware reports **1.5.9-c3ht.1** on its web page.
+The firmware reports **1.5.9-c3ht.2** on its web page.
 
 ## Putting the C3HT into WiFi mode
 
